@@ -13,8 +13,13 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Ion — Personal AI Workstation",
+  title: "Ion",
   description: "A local-first command center across all life projects.",
+  icons: {
+    icon: "/icon.svg",
+    shortcut: "/icon.svg",
+    apple: "/icon.svg",
+  },
 };
 
 export default function RootLayout({
@@ -28,7 +33,7 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
       style={{ colorScheme: "light only" }}
     >
-      <body className="min-h-full bg-void text-bone">
+      <body className="h-dvh overflow-hidden bg-void text-bone">
         <div className="noise-overlay" />
         {children}
       </body>

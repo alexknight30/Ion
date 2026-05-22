@@ -36,6 +36,8 @@
     color-scheme: light only;
     background-color: var(--color-void);
     color: var(--color-bone);
+    height: 100%;
+    overflow: hidden;
   }
 
   body {
@@ -46,6 +48,8 @@
     font-size: 15px;
     font-weight: 400;
     letter-spacing: -0.01em;
+    height: 100%;
+    overflow: hidden;
   }
 }
 

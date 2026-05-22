@@ -20,7 +20,7 @@ export function Surface({ children, className, index = 0 }: SurfaceProps) {
       className={cn(
         "rounded-[12px] border border-[var(--color-border-subtle)] bg-[var(--color-obsidian)] p-8",
         "shadow-[0_1px_3px_var(--color-shadow-soft)]",
-        "min-h-[200px]",
+        "min-h-0",
         className
       )}
     >
