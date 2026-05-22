@@ -1,0 +1,30 @@
+"use client";
+
+import { motion } from "framer-motion";
+import { reveal } from "@/lib/variants";
+import { cn } from "@/lib/cn";
+
+interface SurfaceProps {
+  children: React.ReactNode;
+  className?: string;
+  index?: number;
+}
+
+export function Surface({ children, className, index = 0 }: SurfaceProps) {
+  return (
+    <motion.div
+      variants={reveal}
+      initial="hidden"
+      animate="visible"
+      custom={index}
+      className={cn(
+        "rounded-[12px] border border-[var(--color-border-subtle)] bg-[var(--color-obsidian)] p-8",
+        "shadow-[0_1px_3px_var(--color-shadow-soft)]",
+        "min-h-[200px]",
+        className
+      )}
+    >
+      {children}
+    </motion.div>
+  );
+}
