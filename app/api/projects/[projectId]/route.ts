@@ -38,11 +38,18 @@ export async function PATCH(request: Request, context: RouteContext) {
   const body = await parseJsonBody<{
     name?: unknown;
     description?: unknown;
+    workType?: unknown;
+    color?: unknown;
   }>(request);
 
   if (body instanceof Response) return body;
 
-  const data: { name?: string; description?: string | null } = {};
+  const data: {
+    name?: string;
+    description?: string | null;
+    workType?: string | null;
+    color?: string | null;
+  } = {};
 
   if (body.name !== undefined) {
     const name = requireString(body.name, "name");
@@ -52,6 +59,14 @@ export async function PATCH(request: Request, context: RouteContext) {
 
   if (body.description !== undefined) {
     data.description = optionalString(body.description) ?? null;
+  }
+
+  if (body.workType !== undefined) {
+    data.workType = optionalString(body.workType) ?? null;
+  }
+
+  if (body.color !== undefined) {
+    data.color = optionalString(body.color) ?? null;
   }
 
   if (Object.keys(data).length === 0) {

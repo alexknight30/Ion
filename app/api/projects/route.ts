@@ -29,6 +29,8 @@ export async function POST(request: Request) {
   const body = await parseJsonBody<{
     name?: unknown;
     description?: unknown;
+    workType?: unknown;
+    color?: unknown;
   }>(request);
 
   if (body instanceof Response) return body;
@@ -41,6 +43,8 @@ export async function POST(request: Request) {
       data: {
         name,
         description: optionalString(body.description),
+        workType: optionalString(body.workType),
+        color: optionalString(body.color),
       },
     });
 

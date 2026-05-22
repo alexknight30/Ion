@@ -6,15 +6,13 @@ import { Navbar, type Tab } from "@/components/Navbar";
 import { AgentButton } from "@/components/AgentButton";
 import { Surface } from "@/components/ui/Surface";
 import { Label } from "@/components/ui/Label";
+import { AccordionPanel } from "@/components/workstation/AccordionPanel";
+import { ProjectsPanel } from "@/components/workstation/ProjectsPanel";
 import { cn } from "@/lib/cn";
 
 type WorkstationSection = "Projects" | "Thoughts" | "Artifacts";
 
-const workstationSections: WorkstationSection[] = [
-  "Projects",
-  "Thoughts",
-  "Artifacts",
-];
+const secondarySections: WorkstationSection[] = ["Thoughts", "Artifacts"];
 
 function EmptyState() {
   return (
@@ -53,56 +51,37 @@ function TimeView() {
   );
 }
 
-interface AccordionPanelProps {
+interface SimpleAccordionPanelProps {
   label: WorkstationSection;
   index?: number;
   isOpen: boolean;
   onToggle: () => void;
 }
 
-function AccordionPanel({
+function SimpleAccordionPanel({
   label,
   index = 0,
   isOpen,
   onToggle,
-}: AccordionPanelProps) {
-  return (
-    <Surface
-      index={index}
-      className={cn(
-        "flex flex-col overflow-hidden !p-0 transition-shadow duration-200",
-        isOpen ? "min-h-0 flex-1" : "shrink-0",
-        !isOpen && "hover:shadow-[0_4px_24px_var(--color-shadow-hover)]"
-      )}
+}: SimpleAccordionPanelProps) {
+  const headerAction = (
+    <button
+      type="button"
+      aria-label={`Add to ${label}`}
+      className="flex h-6 w-6 items-center justify-center rounded-[6px] text-[var(--color-pumice)] transition-colors duration-200 hover:bg-[var(--color-ash)] hover:text-[var(--color-steam)]"
     >
-      <div className="relative shrink-0">
-        <button
-          type="button"
-          onClick={onToggle}
-          aria-expanded={isOpen}
-          className="flex w-full items-center px-4 py-4 text-left"
-        >
-          <Label>{label}</Label>
-        </button>
-        {isOpen && (
-          <button
-            type="button"
-            aria-label={`Add to ${label}`}
-            className="absolute right-4 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-[6px] text-[var(--color-pumice)] transition-colors duration-200 hover:bg-[var(--color-ash)] hover:text-[var(--color-steam)]"
-          >
-            <Plus size={16} strokeWidth={1.5} />
-          </button>
-        )}
-      </div>
-      <div
-        className={cn(
-          "grid min-h-0 px-4 pb-4 transition-[grid-template-rows] duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none",
-          isOpen ? "flex-1 grid-rows-[1fr]" : "grid-rows-[0fr]"
-        )}
-      >
-        <div className="min-h-0 overflow-hidden" />
-      </div>
-    </Surface>
+      <Plus size={16} strokeWidth={1.5} />
+    </button>
+  );
+
+  return (
+    <AccordionPanel
+      label={label}
+      index={index}
+      isOpen={isOpen}
+      onToggle={onToggle}
+      headerAction={isOpen ? headerAction : undefined}
+    />
   );
 }
 
@@ -118,11 +97,16 @@ function WorkstationView() {
   return (
     <div className="grid h-full min-h-0 gap-6 md:grid-cols-[minmax(0,1fr)_minmax(0,3fr)]">
       <div className="flex h-full min-h-0 flex-col gap-3">
-        {workstationSections.map((label, index) => (
-          <AccordionPanel
+        <ProjectsPanel
+          index={0}
+          isOpen={openSection === "Projects"}
+          onToggle={() => handleToggle("Projects")}
+        />
+        {secondarySections.map((label, index) => (
+          <SimpleAccordionPanel
             key={label}
             label={label}
-            index={index}
+            index={index + 1}
             isOpen={openSection === label}
             onToggle={() => handleToggle(label)}
           />
