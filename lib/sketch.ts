@@ -88,20 +88,155 @@ export function clampZoom(value: number): number {
 
 export function createSketchNode(
   shape: SketchNodeShape,
-  x: number,
-  y: number
+  centerX: number,
+  centerY: number
 ): SketchNode {
   const size = SKETCH_DEFAULTS[shape];
   return {
     id: crypto.randomUUID(),
     shape,
-    x: x - size.width / 2,
-    y: y - size.height / 2,
+    x: centerX - size.width / 2,
+    y: centerY - size.height / 2,
     width: size.width,
     height: size.height,
     text: "",
   };
 }
+
+export function nodesOverlap(
+  left: Pick<SketchNode, "x" | "y" | "width" | "height">,
+  right: Pick<SketchNode, "x" | "y" | "width" | "height">,
+  gap = 12
+): boolean {
+  return !(
+    left.x + left.width + gap <= right.x ||
+    right.x + right.width + gap <= left.x ||
+    left.y + left.height + gap <= right.y ||
+    right.y + right.height + gap <= left.y
+  );
+}
+
+export function getCanvasCenterWorld(
+  rect: DOMRect,
+  viewport: SketchViewport
+): { x: number; y: number } {
+  return {
+    x: (rect.width / 2 - viewport.x) / viewport.zoom,
+    y: (rect.height / 2 - viewport.y) / viewport.zoom,
+  };
+}
+
+export function placeSketchNode(
+  shape: SketchNodeShape,
+  preferredCenterX: number,
+  preferredCenterY: number,
+  existingNodes: SketchNode[]
+): SketchNode {
+  const step = 36;
+
+  for (let ring = 0; ring < 16; ring += 1) {
+    if (ring === 0) {
+      const candidate = createSketchNode(
+        shape,
+        preferredCenterX,
+        preferredCenterY
+      );
+      if (!existingNodes.some((node) => nodesOverlap(candidate, node))) {
+        return candidate;
+      }
+      continue;
+    }
+
+    for (let dx = -ring; dx <= ring; dx += 1) {
+      for (let dy = -ring; dy <= ring; dy += 1) {
+        if (Math.abs(dx) !== ring && Math.abs(dy) !== ring) continue;
+
+        const candidate = createSketchNode(
+          shape,
+          preferredCenterX + dx * step,
+          preferredCenterY + dy * step
+        );
+
+        if (!existingNodes.some((node) => nodesOverlap(candidate, node))) {
+          return candidate;
+        }
+      }
+    }
+  }
+
+  return createSketchNode(
+    shape,
+    preferredCenterX + step * 2,
+    preferredCenterY + step * 2
+  );
+}
+
+export function duplicateSketchNode(
+  source: SketchNode,
+  centerX: number,
+  centerY: number
+): SketchNode {
+  return {
+    ...source,
+    id: crypto.randomUUID(),
+    x: centerX - source.width / 2,
+    y: centerY - source.height / 2,
+  };
+}
+
+export function duplicateSketchEdge(source: SketchEdge): SketchEdge {
+  return {
+    ...source,
+    id: crypto.randomUUID(),
+  };
+}
+
+export function placeDuplicateNode(
+  source: SketchNode,
+  preferredCenterX: number,
+  preferredCenterY: number,
+  existingNodes: SketchNode[]
+): SketchNode {
+  const initial = duplicateSketchNode(
+    source,
+    preferredCenterX,
+    preferredCenterY
+  );
+
+  if (!existingNodes.some((node) => nodesOverlap(initial, node))) {
+    return initial;
+  }
+
+  const step = 36;
+
+  for (let ring = 1; ring < 16; ring += 1) {
+    for (let dx = -ring; dx <= ring; dx += 1) {
+      for (let dy = -ring; dy <= ring; dy += 1) {
+        if (Math.abs(dx) !== ring && Math.abs(dy) !== ring) continue;
+
+        const candidate = duplicateSketchNode(
+          source,
+          preferredCenterX + dx * step,
+          preferredCenterY + dy * step
+        );
+
+        if (!existingNodes.some((node) => nodesOverlap(candidate, node))) {
+          return candidate;
+        }
+      }
+    }
+  }
+
+  return duplicateSketchNode(
+    source,
+    preferredCenterX + step * 2,
+    preferredCenterY + step * 2
+  );
+}
+
+export type SketchClipboard =
+  | { type: "node"; node: SketchNode }
+  | { type: "edge"; edge: SketchEdge };
 
 export function createSketchEdge(
   kind: SketchEdgeKind,
