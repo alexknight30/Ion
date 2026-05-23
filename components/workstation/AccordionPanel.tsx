@@ -17,8 +17,11 @@ interface AccordionPanelProps {
   className?: string;
 }
 
-const ACCORDION_DURATION = "1200ms";
 const ACCORDION_EASE = "cubic-bezier(0.16,1,0.3,1)";
+const ACCORDION_DURATION: Record<"fill" | "limited", string> = {
+  limited: "1200ms",
+  fill: "1800ms",
+};
 
 export function AccordionPanel({
   label,
@@ -86,7 +89,7 @@ export function AccordionPanel({
         )}
         style={{
           transitionProperty: "grid-template-rows",
-          transitionDuration: ACCORDION_DURATION,
+          transitionDuration: ACCORDION_DURATION[expandSize],
           transitionTimingFunction: ACCORDION_EASE,
         }}
       >

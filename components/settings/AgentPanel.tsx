@@ -14,8 +14,10 @@ const ANTHROPIC_MODELS = [
   { id: "claude-haiku-4-5", label: "Claude Haiku 4.5" },
 ] as const;
 
+type AnthropicModelId = (typeof ANTHROPIC_MODELS)[number]["id"];
+
 export function AgentPanel() {
-  const [model, setModel] = useState(ANTHROPIC_MODELS[1].id);
+  const [model, setModel] = useState<AnthropicModelId>(ANTHROPIC_MODELS[1].id);
   const [apiKey, setApiKey] = useState("");
   const [adminApiKey, setAdminApiKey] = useState("");
 
@@ -30,7 +32,9 @@ export function AgentPanel() {
             <select
               id="agent-model"
               value={model}
-              onChange={(event) => setModel(event.target.value)}
+              onChange={(event) =>
+                setModel(event.target.value as AnthropicModelId)
+              }
               className={cn(
                 inputClassName,
                 "appearance-none pr-10"

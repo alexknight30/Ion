@@ -45,3 +45,33 @@ export function shiftMonth(year: number, month: number, delta: number) {
   const date = new Date(year, month + delta, 1);
   return { year: date.getFullYear(), month: date.getMonth() };
 }
+
+export interface CalendarDate {
+  year: number;
+  month: number;
+  day: number;
+}
+
+export function toDateKey({ year, month, day }: CalendarDate) {
+  const monthPart = String(month + 1).padStart(2, "0");
+  const dayPart = String(day).padStart(2, "0");
+  return `${year}-${monthPart}-${dayPart}`;
+}
+
+export function formatTodoListDate({ year, month, day }: CalendarDate) {
+  return new Date(year, month, day).toLocaleDateString(undefined, {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+export function getTodayDate(): CalendarDate {
+  const today = new Date();
+  return {
+    year: today.getFullYear(),
+    month: today.getMonth(),
+    day: today.getDate(),
+  };
+}

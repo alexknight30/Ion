@@ -11,23 +11,26 @@ import {
   isSameDay,
   shiftMonth,
   WEEKDAY_LABELS,
+  type CalendarDate,
 } from "@/lib/calendar";
 
 interface CalendarPanelProps {
+  selectedDate: CalendarDate;
+  onSelectDate: (date: CalendarDate) => void;
   index?: number;
   className?: string;
 }
 
-export function CalendarPanel({ index = 0, className }: CalendarPanelProps) {
+export function CalendarPanel({
+  selectedDate,
+  onSelectDate,
+  index = 0,
+  className,
+}: CalendarPanelProps) {
   const today = useMemo(() => new Date(), []);
   const [visibleMonth, setVisibleMonth] = useState(() => ({
-    year: today.getFullYear(),
-    month: today.getMonth(),
-  }));
-  const [selectedDate, setSelectedDate] = useState(() => ({
-    year: today.getFullYear(),
-    month: today.getMonth(),
-    day: today.getDate(),
+    year: selectedDate.year,
+    month: selectedDate.month,
   }));
 
   const cells = useMemo(
@@ -43,6 +46,14 @@ export function CalendarPanel({ index = 0, className }: CalendarPanelProps) {
 
   function goToNextMonth() {
     setVisibleMonth((current) => shiftMonth(current.year, current.month, 1));
+  }
+
+  function handleSelectDay(day: number) {
+    onSelectDate({
+      year: visibleMonth.year,
+      month: visibleMonth.month,
+      day,
+    });
   }
 
   return (
@@ -104,13 +115,7 @@ export function CalendarPanel({ index = 0, className }: CalendarPanelProps) {
               <button
                 key={`${visibleMonth.year}-${visibleMonth.month}-${day}`}
                 type="button"
-                onClick={() =>
-                  setSelectedDate({
-                    year: visibleMonth.year,
-                    month: visibleMonth.month,
-                    day,
-                  })
-                }
+                onClick={() => handleSelectDay(day)}
                 className={cn(
                   "mx-auto flex h-9 w-9 items-center justify-center rounded-full text-[13px] tracking-[-0.01em] transition-[background-color,color,box-shadow] duration-200",
                   isSelected
