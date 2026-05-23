@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Check } from "lucide-react";
+import { Check, GripVertical } from "lucide-react";
 import { cn } from "@/lib/cn";
 import type { Project } from "@/lib/projects";
 import type { Todo } from "@/lib/todos";
@@ -206,9 +206,12 @@ interface TodoRowProps {
   projects: Project[];
   autoFocus?: boolean;
   isDeleteRevealed: boolean;
+  isDraggingOrder?: boolean;
   onRevealDelete: () => void;
   onCloseActions: () => void;
   onInteractionStart?: () => void;
+  onDragStart: () => void;
+  onDragEnd: () => void;
   onUpdate: (
     id: string,
     input: Partial<Pick<Todo, "title" | "completed" | "projectId">>
@@ -221,9 +224,12 @@ export function TodoRow({
   projects,
   autoFocus = false,
   isDeleteRevealed,
+  isDraggingOrder = false,
   onRevealDelete,
   onCloseActions,
   onInteractionStart,
+  onDragStart,
+  onDragEnd,
   onUpdate,
   onDelete,
 }: TodoRowProps) {
@@ -239,7 +245,6 @@ export function TodoRow({
     null
   );
   const hasMoved = useRef(false);
-  const didSwipe = useRef(false);
   const saveTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastSavedTitle = useRef(todo.title);
 
@@ -310,7 +315,9 @@ export function TodoRow({
     await onUpdate(todo.id, { completed: !todo.completed });
   }
 
-  function handleRowPointerDown(event: React.PointerEvent<HTMLDivElement>) {
+  function handleDeleteSwipePointerDown(
+    event: React.PointerEvent<HTMLDivElement>
+  ) {
     if (deleting) return;
 
     onInteractionStart?.();
@@ -319,12 +326,13 @@ export function TodoRow({
     startDeleteOffset.current = isDeleteRevealed ? ACTION_WIDTH : 0;
     dragAxis.current = null;
     hasMoved.current = false;
-    didSwipe.current = false;
     setIsDragging(true);
     event.currentTarget.setPointerCapture(event.pointerId);
   }
 
-  function handleRowPointerMove(event: React.PointerEvent<HTMLDivElement>) {
+  function handleDeleteSwipePointerMove(
+    event: React.PointerEvent<HTMLDivElement>
+  ) {
     if (!isDragging || deleting) return;
 
     const deltaXLeft = startX.current - event.clientX;
@@ -355,7 +363,6 @@ export function TodoRow({
     if (dragAxis.current === "vertical") return;
 
     hasMoved.current = true;
-    didSwipe.current = true;
     event.preventDefault();
 
     if (dragAxis.current === "close-delete") {
@@ -371,7 +378,9 @@ export function TodoRow({
     );
   }
 
-  function handleRowPointerUp(event: React.PointerEvent<HTMLDivElement>) {
+  function handleDeleteSwipePointerUp(
+    event: React.PointerEvent<HTMLDivElement>
+  ) {
     if (!isDragging || deleting) return;
 
     setIsDragging(false);
@@ -445,24 +454,42 @@ export function TodoRow({
       <div
         style={{ transform: `translateX(-${displayDeleteOffset}px)` }}
         className={cn(
-          "relative bg-[var(--color-obsidian)]",
+          "relative flex items-stretch bg-[var(--color-obsidian)]",
           !isDragging &&
             "transition-transform duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none"
         )}
       >
-        <div
-          data-todo-row
-          onPointerDown={handleRowPointerDown}
-          onPointerMove={handleRowPointerMove}
-          onPointerUp={handleRowPointerUp}
-          onPointerCancel={handleRowPointerUp}
-          className="flex touch-pan-y items-center gap-3 py-2.5"
-        >
+        <div className="flex min-w-0 flex-1 items-center gap-2 py-2.5">
+          <div
+            data-todo-drag-handle
+            draggable
+            onDragStart={(event) => {
+              event.dataTransfer.effectAllowed = "move";
+              event.dataTransfer.setData("text/plain", todo.id);
+              onDragStart();
+            }}
+            onDragEnd={onDragEnd}
+            onPointerDown={(event) => event.stopPropagation()}
+            aria-label="Drag to reorder"
+            className={cn(
+              "group flex w-5 shrink-0 cursor-grab items-center justify-center self-stretch active:cursor-grabbing",
+              isDraggingOrder && "cursor-grabbing"
+            )}
+          >
+            <GripVertical
+              size={14}
+              strokeWidth={1.5}
+              className="text-[var(--color-pumice)] opacity-0 transition-opacity duration-200 group-hover:opacity-100"
+            />
+          </div>
+
           <button
             type="button"
             data-todo-complete
             aria-label={todo.completed ? "Mark incomplete" : "Mark complete"}
-            onClick={() => {
+            onPointerDown={(event) => event.stopPropagation()}
+            onClick={(event) => {
+              event.stopPropagation();
               void handleToggleComplete();
             }}
             className="flex h-5 w-5 shrink-0 items-center justify-center"
@@ -476,7 +503,11 @@ export function TodoRow({
               )}
             >
               {todo.completed ? (
-                <Check size={10} strokeWidth={2.5} className="text-[var(--color-obsidian)]" />
+                <Check
+                  size={10}
+                  strokeWidth={2.5}
+                  className="text-[var(--color-obsidian)]"
+                />
               ) : null}
             </span>
           </button>
@@ -487,8 +518,6 @@ export function TodoRow({
             value={title}
             onChange={(event) => handleTitleChange(event.target.value)}
             onBlur={() => void handleTitleBlur()}
-            onClick={(event) => event.stopPropagation()}
-            onPointerDown={(event) => event.stopPropagation()}
             placeholder="New task"
             className={cn(
               "min-w-0 flex-1 bg-transparent text-[14px] tracking-[-0.01em] outline-none placeholder:text-[var(--color-pumice)]",
@@ -506,6 +535,16 @@ export function TodoRow({
             }}
           />
         </div>
+
+        <div
+          data-todo-delete-swipe
+          aria-label="Swipe left to delete"
+          onPointerDown={handleDeleteSwipePointerDown}
+          onPointerMove={handleDeleteSwipePointerMove}
+          onPointerUp={handleDeleteSwipePointerUp}
+          onPointerCancel={handleDeleteSwipePointerUp}
+          className="w-8 shrink-0 touch-pan-y"
+        />
       </div>
     </div>
   );

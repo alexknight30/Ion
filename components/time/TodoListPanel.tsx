@@ -12,6 +12,7 @@ import {
   createTodo,
   deleteTodo,
   fetchTodos,
+  reorderTodos,
   updateTodo,
   type Todo,
 } from "@/lib/todos";
@@ -20,6 +21,21 @@ interface TodoListPanelProps {
   selectedDate: CalendarDate;
   index?: number;
   className?: string;
+}
+
+function reorderTodoList(todos: Todo[], draggedId: string, insertIndex: number) {
+  const fromIndex = todos.findIndex((todo) => todo.id === draggedId);
+  if (fromIndex === -1) return todos;
+
+  const next = [...todos];
+  const [moved] = next.splice(fromIndex, 1);
+  let targetIndex = insertIndex;
+  if (fromIndex < targetIndex) targetIndex -= 1;
+  if (targetIndex === fromIndex) return todos;
+
+  next.splice(targetIndex, 0, moved);
+
+  return next.map((todo, index) => ({ ...todo, position: index }));
 }
 
 export function TodoListPanel({
@@ -34,6 +50,8 @@ export function TodoListPanel({
   const [focusTodoId, setFocusTodoId] = useState<string | null>(null);
   const [deleteRevealedId, setDeleteRevealedId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [draggedTodoId, setDraggedTodoId] = useState<string | null>(null);
+  const [dropInsertIndex, setDropInsertIndex] = useState<number | null>(null);
 
   const dateKey = toDateKey(selectedDate);
 
@@ -55,6 +73,8 @@ export function TodoListPanel({
     void loadTodos();
     setDeleteRevealedId(null);
     setFocusTodoId(null);
+    setDraggedTodoId(null);
+    setDropInsertIndex(null);
   }, [loadTodos]);
 
   useEffect(() => {
@@ -70,7 +90,8 @@ export function TodoListPanel({
 
       if (
         target.closest("[data-todo-delete]") ||
-        target.closest("[data-todo-row]")
+        target.closest("[data-todo-delete-swipe]") ||
+        target.closest("[data-todo-drag-handle]")
       ) {
         return;
       }
@@ -129,8 +150,57 @@ export function TodoListPanel({
     }
   }
 
+  async function handleReorder(draggedId: string, insertIndex: number) {
+    const reordered = reorderTodoList(todos, draggedId, insertIndex);
+    const orderChanged = reordered.some(
+      (todo, index) => todos[index]?.id !== todo.id
+    );
+
+    setDraggedTodoId(null);
+    setDropInsertIndex(null);
+
+    if (!orderChanged) return;
+
+    setTodos(reordered);
+
+    try {
+      const updated = await reorderTodos(reordered);
+      setTodos(updated);
+    } catch {
+      await loadTodos();
+    }
+  }
+
+  function handleDragStart(todoId: string) {
+    setDraggedTodoId(todoId);
+    setDeleteRevealedId(null);
+  }
+
+  function handleDragEnd() {
+    setDraggedTodoId(null);
+    setDropInsertIndex(null);
+  }
+
+  function handleDragOver(event: React.DragEvent<HTMLDivElement>, index: number) {
+    event.preventDefault();
+    if (!draggedTodoId) return;
+
+    const rect = event.currentTarget.getBoundingClientRect();
+    const insertIndex = event.clientY < rect.top + rect.height / 2 ? index : index + 1;
+    setDropInsertIndex(insertIndex);
+  }
+
+  function handleDrop(event: React.DragEvent<HTMLDivElement>) {
+    event.preventDefault();
+    if (!draggedTodoId || dropInsertIndex === null) return;
+    void handleReorder(draggedTodoId, dropInsertIndex);
+  }
+
   return (
-    <Surface index={index} className={cn("flex min-h-0 flex-col", className)}>
+    <Surface
+      index={index}
+      className={cn("flex min-h-0 flex-col px-4 py-8", className)}
+    >
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
           <Label>To-Do List</Label>
@@ -166,23 +236,43 @@ export function TodoListPanel({
           </div>
         ) : (
           <div className="flex flex-col divide-y divide-[var(--color-border-subtle)]">
-            {todos.map((todo) => (
-              <TodoRow
+            {todos.map((todo, todoIndex) => (
+              <div
                 key={todo.id}
-                todo={todo}
-                projects={projects}
-                autoFocus={focusTodoId === todo.id}
-                isDeleteRevealed={deleteRevealedId === todo.id}
-                onRevealDelete={() => setDeleteRevealedId(todo.id)}
-                onCloseActions={() => setDeleteRevealedId(null)}
-                onInteractionStart={() => {
-                  if (deleteRevealedId && deleteRevealedId !== todo.id) {
-                    setDeleteRevealedId(null);
-                  }
-                }}
-                onUpdate={handleUpdateTodo}
-                onDelete={handleDeleteTodo}
-              />
+                onDragOver={(event) => handleDragOver(event, todoIndex)}
+                onDrop={handleDrop}
+                className={cn(
+                  "relative",
+                  draggedTodoId === todo.id && "opacity-50",
+                  dropInsertIndex === todoIndex &&
+                    draggedTodoId &&
+                    draggedTodoId !== todo.id &&
+                    "before:absolute before:inset-x-0 before:top-0 before:h-[2px] before:bg-[var(--color-aurora)]",
+                  dropInsertIndex === todoIndex + 1 &&
+                    draggedTodoId &&
+                    draggedTodoId !== todo.id &&
+                    "after:absolute after:inset-x-0 after:bottom-0 after:h-[2px] after:bg-[var(--color-aurora)]"
+                )}
+              >
+                <TodoRow
+                  todo={todo}
+                  projects={projects}
+                  autoFocus={focusTodoId === todo.id}
+                  isDeleteRevealed={deleteRevealedId === todo.id}
+                  isDraggingOrder={draggedTodoId === todo.id}
+                  onRevealDelete={() => setDeleteRevealedId(todo.id)}
+                  onCloseActions={() => setDeleteRevealedId(null)}
+                  onInteractionStart={() => {
+                    if (deleteRevealedId && deleteRevealedId !== todo.id) {
+                      setDeleteRevealedId(null);
+                    }
+                  }}
+                  onDragStart={() => handleDragStart(todo.id)}
+                  onDragEnd={handleDragEnd}
+                  onUpdate={handleUpdateTodo}
+                  onDelete={handleDeleteTodo}
+                />
+              </div>
             ))}
           </div>
         )}

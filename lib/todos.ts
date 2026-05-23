@@ -74,3 +74,14 @@ export async function deleteTodo(id: string): Promise<void> {
     throw new Error("Failed to delete todo");
   }
 }
+
+export async function reorderTodos(todos: Todo[]): Promise<Todo[]> {
+  const updates = await Promise.all(
+    todos.map((todo, index) => {
+      if (todo.position === index) return Promise.resolve(todo);
+      return updateTodo(todo.id, { position: index });
+    })
+  );
+
+  return updates;
+}
