@@ -84,47 +84,6 @@ export function buildThoughtDestinationOptions(
   });
 }
 
-export function buildArtifactParentOptions(
-  artifacts: Artifact[],
-  projects: Project[]
-): ArtifactSelectOption[] {
-  const options: ArtifactSelectOption[] = [];
-  const coveredProjectIds = new Set<string>();
-
-  const assignableArtifacts = artifacts.filter(
-    (artifact) =>
-      artifact.projectId &&
-      (isProjectThoughtsJournal(artifact) || isUserCreatableArtifact(artifact))
-  );
-
-  for (const artifact of assignableArtifacts) {
-    if (!artifact.projectId) continue;
-
-    coveredProjectIds.add(artifact.projectId);
-    options.push({
-      id: artifact.id,
-      label: getArtifactDisplayTitle(artifact),
-      subtitle: `${artifact.project?.name ?? "Project"} · ${getArtifactTypeLabel(artifact.kind)}`,
-      color: artifact.project?.color ?? null,
-      projectId: artifact.projectId,
-    });
-  }
-
-  for (const project of projects) {
-    if (coveredProjectIds.has(project.id)) continue;
-
-    options.push({
-      id: `project:${project.id}`,
-      label: getProjectThoughtsDisplayTitle(project.name),
-      subtitle: `${project.name} · No artifacts yet`,
-      color: project.color,
-      projectId: project.id,
-    });
-  }
-
-  return options.sort(sortByProjectThenLabel);
-}
-
 export function getProjectIdForOption(
   options: ArtifactSelectOption[],
   optionId: string

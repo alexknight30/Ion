@@ -98,13 +98,11 @@ export async function getOrCreateProjectThoughtsArtifact(projectId: string) {
   const project = await db.project.findUnique({ where: { id: projectId } });
   if (!project) return null;
 
-  const title = getProjectThoughtsTitle(project.name);
   const existing = await db.artifact.findFirst({
     where: {
       projectId,
       isSystem: true,
       kind: THOUGHTS_JOURNAL_KIND,
-      title,
     },
   });
 
@@ -112,7 +110,7 @@ export async function getOrCreateProjectThoughtsArtifact(projectId: string) {
 
   return db.artifact.create({
     data: {
-      title,
+      title: getProjectThoughtsTitle(project.name),
       kind: THOUGHTS_JOURNAL_KIND,
       projectId,
       isSystem: true,

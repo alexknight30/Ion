@@ -28,6 +28,7 @@ import { updateThought } from "@/lib/thoughts";
 
 interface WhiteboardProps {
   artifactId: string | null;
+  focusedNoteId?: string | null;
   refreshKey?: number;
   onClose: () => void;
   index?: number;
@@ -142,7 +143,7 @@ function ThoughtEntry({
   }
 
   return (
-    <article className="flex flex-col gap-2">
+    <article data-thought-id={note.id} className="flex scroll-mt-4 flex-col gap-2">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
         <h3 className="text-[12px] font-medium tracking-[-0.01em] text-[var(--color-pumice)]">
           [{formatThoughtTimestamp(displayNote.createdAt)}]
@@ -193,10 +194,27 @@ function groupNotesByDay(notes: ThoughtNote[]) {
 function ThoughtJournalView({
   notes,
   onNoteUpdate,
+  focusedNoteId,
 }: {
   notes: ThoughtNote[];
   onNoteUpdate: (noteId: string, content: string) => Promise<ThoughtNote>;
+  focusedNoteId?: string | null;
 }) {
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!focusedNoteId || notes.length === 0) return;
+
+    const timeout = window.setTimeout(() => {
+      const element = scrollContainerRef.current?.querySelector(
+        `[data-thought-id="${focusedNoteId}"]`
+      );
+      element?.scrollIntoView({ block: "center", behavior: "smooth" });
+    }, 50);
+
+    return () => window.clearTimeout(timeout);
+  }, [focusedNoteId, notes]);
+
   if (notes.length === 0) {
     return (
       <div className="flex flex-1 items-center justify-center">
@@ -210,7 +228,10 @@ function ThoughtJournalView({
   const dayGroups = groupNotesByDay(notes);
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-8 overflow-y-auto pr-1">
+    <div
+      ref={scrollContainerRef}
+      className="flex min-h-0 flex-1 flex-col gap-8 overflow-y-auto pr-1"
+    >
       {dayGroups.map((group, groupIndex) => (
         <section key={group.dayKey}>
           {groupIndex > 0 ? (
@@ -252,6 +273,7 @@ function TextArtifactView({
 
 export function Whiteboard({
   artifactId,
+  focusedNoteId = null,
   refreshKey = 0,
   onClose,
   index = 3,
@@ -389,6 +411,7 @@ export function Whiteboard({
               <ThoughtJournalView
                 notes={artifact.notes ?? []}
                 onNoteUpdate={handleNoteUpdate}
+                focusedNoteId={focusedNoteId}
               />
             ) : isSketch ? (
               <SketchEditor

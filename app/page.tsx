@@ -74,6 +74,7 @@ function WorkView() {
     null
   );
   const [activeArtifactId, setActiveArtifactId] = useState<string | null>(null);
+  const [activeNoteId, setActiveNoteId] = useState<string | null>(null);
   const [whiteboardRefreshKey, setWhiteboardRefreshKey] = useState(0);
   const [projectsRefreshKey, setProjectsRefreshKey] = useState(0);
 
@@ -81,9 +82,17 @@ function WorkView() {
     setOpenSection((current) => (current === section ? null : section));
   };
 
-  const handleOpenArtifact = (artifactId: string) => {
+  const handleOpenArtifact = (artifactId: string, noteId?: string) => {
+    if (artifactId !== activeArtifactId) {
+      setWhiteboardRefreshKey((current) => current + 1);
+    }
     setActiveArtifactId(artifactId);
-    setWhiteboardRefreshKey((current) => current + 1);
+    setActiveNoteId(noteId ?? null);
+  };
+
+  const handleCloseArtifact = () => {
+    setActiveArtifactId(null);
+    setActiveNoteId(null);
   };
 
   return (
@@ -97,6 +106,7 @@ function WorkView() {
             setProjectsRefreshKey((current) => current + 1)
           }
           onOpenArtifact={handleOpenArtifact}
+          activeNoteId={activeNoteId}
           artifactsRefreshKey={whiteboardRefreshKey}
           projectsRefreshKey={projectsRefreshKey}
         />
@@ -119,8 +129,9 @@ function WorkView() {
       </div>
       <Whiteboard
         artifactId={activeArtifactId}
+        focusedNoteId={activeNoteId}
         refreshKey={whiteboardRefreshKey}
-        onClose={() => setActiveArtifactId(null)}
+        onClose={handleCloseArtifact}
         index={3}
       />
     </div>

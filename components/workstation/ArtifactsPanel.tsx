@@ -37,7 +37,6 @@ export function ArtifactsPanel({
     []
   );
   const [artifacts, setArtifacts] = useState<Artifact[]>([]);
-  const [allArtifacts, setAllArtifacts] = useState<Artifact[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -54,7 +53,6 @@ export function ArtifactsPanel({
 
         if (cancelled) return;
 
-        setAllArtifacts(artifactList);
         setMiscThoughts(
           artifactList.find(
             (artifact) =>
@@ -84,7 +82,6 @@ export function ArtifactsPanel({
           setMiscThoughts(null);
           setProjectThoughtJournals([]);
           setArtifacts([]);
-          setAllArtifacts([]);
           setProjects([]);
         }
       } finally {
@@ -136,7 +133,6 @@ export function ArtifactsPanel({
     >
       {showForm ? (
         <ArtifactForm
-          artifacts={allArtifacts}
           projects={projects}
           onSave={handleSave}
           onCancel={() => setShowForm(false)}

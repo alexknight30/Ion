@@ -1,23 +1,17 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { cn } from "@/lib/cn";
-import { ArtifactSelect } from "@/components/workstation/ArtifactSelect";
+import { ProjectSelect } from "@/components/workstation/ProjectSelect";
 import {
   ARTIFACT_TYPES,
-  type Artifact,
   type ArtifactType,
   type CreateArtifactInput,
 } from "@/lib/artifacts";
-import {
-  buildArtifactParentOptions,
-  getProjectIdForOption,
-} from "@/lib/artifact-select-options";
 import { serializeSketch, createEmptySketchDocument } from "@/lib/sketch";
 import type { Project } from "@/lib/projects";
 
 interface ArtifactFormProps {
-  artifacts: Artifact[];
   projects: Project[];
   onSave: (input: CreateArtifactInput) => Promise<void>;
   onCancel: () => void;
@@ -35,31 +29,25 @@ const inputClassName =
   "w-full rounded-[8px] border border-[var(--color-border-subtle)] bg-[var(--color-obsidian)] px-3 py-2 text-[14px] text-[var(--color-bone)] outline-none transition-[border-color,box-shadow] duration-200 placeholder:text-[var(--color-pumice)] focus:border-[var(--color-border-active)] focus:shadow-[0_0_0_3px_rgba(0,0,0,0.04)]";
 
 export function ArtifactForm({
-  artifacts,
   projects,
   onSave,
   onCancel,
 }: ArtifactFormProps) {
   const [title, setTitle] = useState("");
   const [type, setType] = useState<ArtifactType>("txt");
-  const [selectedOptionId, setSelectedOptionId] = useState("");
+  const [projectId, setProjectId] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const parentOptions = useMemo(
-    () => buildArtifactParentOptions(artifacts, projects),
-    [artifacts, projects]
-  );
-
   useEffect(() => {
-    if (parentOptions.length === 0) return;
+    if (projects.length === 0) return;
 
-    setSelectedOptionId((current) =>
-      parentOptions.some((option) => option.id === current)
+    setProjectId((current) =>
+      projects.some((project) => project.id === current)
         ? current
-        : parentOptions[0].id
+        : projects[0].id
     );
-  }, [parentOptions]);
+  }, [projects]);
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
@@ -70,7 +58,6 @@ export function ArtifactForm({
       return;
     }
 
-    const projectId = getProjectIdForOption(parentOptions, selectedOptionId);
     if (!projectId) {
       setError("Project is required");
       return;
@@ -143,19 +130,17 @@ export function ArtifactForm({
           </span>
         )}
         <div className="flex items-center gap-2">
-          <ArtifactSelect
-            options={parentOptions}
-            value={selectedOptionId}
-            onChange={setSelectedOptionId}
-            disabled={parentOptions.length === 0}
-            placeholder="Select project artifact"
-            emptyLabel="No projects"
+          <ProjectSelect
+            projects={projects}
+            value={projectId}
+            onChange={setProjectId}
+            disabled={projects.length === 0}
             dropdownDirection="down"
             ariaLabel="Assign artifact to project"
           />
           <button
             type="submit"
-            disabled={saving || parentOptions.length === 0}
+            disabled={saving || projects.length === 0}
             className="shrink-0 rounded-[8px] bg-[var(--color-frost)] px-3 py-2 text-[13px] font-medium tracking-[-0.01em] text-[var(--color-bone)] transition-[background-color,opacity] duration-200 hover:bg-[var(--color-ash)] disabled:cursor-not-allowed disabled:opacity-50"
           >
             {saving ? "Saving…" : "Save"}

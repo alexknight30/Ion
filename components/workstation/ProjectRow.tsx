@@ -32,7 +32,8 @@ interface ProjectRowProps {
   onCloseActions: () => void;
   onDelete: (id: string) => Promise<void>;
   onEdit: (project: Project) => void;
-  onOpenArtifact: (artifactId: string) => void;
+  onOpenArtifact: (artifactId: string, noteId?: string) => void;
+  activeNoteId?: string | null;
   onInteractionStart?: () => void;
 }
 
@@ -50,6 +51,7 @@ export function ProjectRow({
   onDelete,
   onEdit,
   onOpenArtifact,
+  activeNoteId = null,
   onInteractionStart,
 }: ProjectRowProps) {
   const [openSubSection, setOpenSubSection] = useState<ProjectSubSection | null>(
@@ -467,17 +469,32 @@ export function ProjectRow({
                   thoughtJournal &&
                   thoughtNotes.map((note) => {
                     const journalId = thoughtJournal.id;
+                    const isSelected = note.id === activeNoteId;
                     return (
                     <button
                       key={note.id}
                       type="button"
-                      onClick={() => onOpenArtifact(journalId)}
+                      onClick={() => onOpenArtifact(journalId, note.id)}
                       className="py-1 text-left transition-colors duration-200 hover:text-[var(--color-glacier)]"
                     >
-                      <span className="block truncate text-[11px] tracking-[-0.01em] text-[var(--color-pumice)]">
+                      <span
+                        className={cn(
+                          "block truncate text-[11px] tracking-[-0.01em]",
+                          isSelected
+                            ? "text-[var(--color-bone)]"
+                            : "text-[var(--color-pumice)]"
+                        )}
+                      >
                         [{formatThoughtTimestamp(note.createdAt)}]
                       </span>
-                      <span className="block truncate text-[12px] tracking-[-0.01em] text-[var(--color-steam)]">
+                      <span
+                        className={cn(
+                          "block truncate text-[12px] tracking-[-0.01em]",
+                          isSelected
+                            ? "text-[var(--color-bone)]"
+                            : "text-[var(--color-steam)]"
+                        )}
+                      >
                         {note.content}
                       </span>
                     </button>

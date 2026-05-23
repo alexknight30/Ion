@@ -1,6 +1,5 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { Surface } from "@/components/ui/Surface";
 import { Label } from "@/components/ui/Label";
 import { cn } from "@/lib/cn";
@@ -34,23 +33,6 @@ export function AccordionPanel({
   expandSize = "fill",
   className,
 }: AccordionPanelProps) {
-  const [allowScroll, setAllowScroll] = useState(false);
-
-  useEffect(() => {
-    if (!isOpen) {
-      setAllowScroll(false);
-    }
-  }, [isOpen]);
-
-  function handleContentTransitionEnd(
-    event: React.TransitionEvent<HTMLDivElement>
-  ) {
-    if (event.propertyName !== "grid-template-rows") return;
-    if (isOpen && scrollContent) {
-      setAllowScroll(true);
-    }
-  }
-
   return (
     <Surface
       index={index}
@@ -82,7 +64,6 @@ export function AccordionPanel({
       </div>
 
       <div
-        onTransitionEnd={handleContentTransitionEnd}
         className={cn(
           "grid min-h-0 motion-reduce:transition-none",
           isOpen ? "min-h-0 flex-1 grid-rows-[1fr] px-4 pb-4" : "grid-rows-[0fr]"
@@ -96,10 +77,9 @@ export function AccordionPanel({
         <div className="min-h-0 overflow-hidden">
           <div
             className={cn(
-              "flex h-full min-h-0 flex-col",
-              allowScroll && scrollContent
-                ? "overflow-y-auto"
-                : "overflow-hidden"
+              "flex min-h-0 flex-col",
+              isOpen && "min-h-0 flex-1",
+              isOpen && scrollContent && "overflow-y-auto"
             )}
           >
             {children}

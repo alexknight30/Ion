@@ -25,7 +25,8 @@ interface ProjectsPanelProps {
   isOpen: boolean;
   onToggle: () => void;
   onProjectsChange?: () => void;
-  onOpenArtifact?: (artifactId: string) => void;
+  onOpenArtifact?: (artifactId: string, noteId?: string) => void;
+  activeNoteId?: string | null;
   artifactsRefreshKey?: number;
   projectsRefreshKey?: number;
 }
@@ -41,6 +42,7 @@ export function ProjectsPanel({
   onToggle,
   onProjectsChange,
   onOpenArtifact,
+  activeNoteId = null,
   artifactsRefreshKey = 0,
   projectsRefreshKey = 0,
 }: ProjectsPanelProps) {
@@ -235,7 +237,10 @@ export function ProjectsPanel({
                   onCloseActions={() => setSwipeAction(null)}
                   onDelete={handleDelete}
                   onEdit={openEditForm}
-                  onOpenArtifact={(artifactId) => onOpenArtifact?.(artifactId)}
+                  onOpenArtifact={(artifactId, noteId) =>
+                    onOpenArtifact?.(artifactId, noteId)
+                  }
+                  activeNoteId={activeNoteId}
                   onInteractionStart={() => {
                     setSwipeAction((current) =>
                       current?.projectId === project.id ? current : null
