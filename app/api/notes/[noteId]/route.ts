@@ -3,7 +3,6 @@ import {
   badRequest,
   json,
   notFound,
-  optionalString,
   parseJsonBody,
   requireString,
   serverError,
@@ -28,48 +27,19 @@ export async function GET(_request: Request, context: RouteContext) {
 export async function PATCH(request: Request, context: RouteContext) {
   const { noteId } = await context.params;
   const body = await parseJsonBody<{
-    title?: unknown;
     content?: unknown;
-    projectId?: unknown;
   }>(request);
 
   if (body instanceof Response) return body;
 
-  const data: {
-    title?: string | null;
-    content?: string;
-    projectId?: string;
-  } = {};
-
-  if (body.title !== undefined) {
-    data.title = optionalString(body.title) ?? null;
-  }
-
-  if (typeof body.content === "string") {
-    data.content = body.content;
-  }
-
-  if (body.projectId !== undefined) {
-    const projectId = requireString(body.projectId, "projectId");
-    if (projectId instanceof Response) return projectId;
-
-    const project = await db.project.findUnique({
-      where: { id: projectId },
-      select: { id: true },
-    });
-
-    if (!project) return notFound("Project not found");
-    data.projectId = projectId;
-  }
-
-  if (Object.keys(data).length === 0) {
+  if (typeof body.content !== "string") {
     return badRequest("No valid fields to update");
   }
 
   try {
     const note = await db.note.update({
       where: { id: noteId },
-      data,
+      data: { content: body.content },
     });
 
     return json(note);

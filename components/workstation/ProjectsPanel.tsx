@@ -19,6 +19,7 @@ interface ProjectsPanelProps {
   index?: number;
   isOpen: boolean;
   onToggle: () => void;
+  onProjectsChange?: () => void;
 }
 
 type SwipeAction = {
@@ -26,7 +27,12 @@ type SwipeAction = {
   type: "delete" | "edit";
 };
 
-export function ProjectsPanel({ index = 0, isOpen, onToggle }: ProjectsPanelProps) {
+export function ProjectsPanel({
+  index = 0,
+  isOpen,
+  onToggle,
+  onProjectsChange,
+}: ProjectsPanelProps) {
   const [projects, setProjects] = useState<Project[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
@@ -117,6 +123,7 @@ export function ProjectsPanel({ index = 0, isOpen, onToggle }: ProjectsPanelProp
       const project = await createProject(input);
       setProjects((current) => [project, ...current]);
     }
+    onProjectsChange?.();
     closeForm();
   }
 
@@ -127,6 +134,7 @@ export function ProjectsPanel({ index = 0, isOpen, onToggle }: ProjectsPanelProp
       current?.projectId === id ? null : current
     );
     setExpandedProjectId((current) => (current === id ? null : current));
+    onProjectsChange?.();
   }
 
   const headerAction = (

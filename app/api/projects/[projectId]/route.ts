@@ -20,7 +20,6 @@ export async function GET(_request: Request, context: RouteContext) {
     const project = await db.project.findUnique({
       where: { id: projectId },
       include: {
-        notes: { orderBy: { updatedAt: "desc" } },
         artifacts: { orderBy: { updatedAt: "desc" } },
       },
     });

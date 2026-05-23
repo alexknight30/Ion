@@ -1,22 +1,20 @@
 "use client";
 
 import { useState } from "react";
-import { Plus } from "lucide-react";
 import { Navbar, type Tab } from "@/components/Navbar";
 import { AgentButton } from "@/components/AgentButton";
 import { Surface } from "@/components/ui/Surface";
 import { Label } from "@/components/ui/Label";
-import { AccordionPanel } from "@/components/workstation/AccordionPanel";
 import { ProjectsPanel } from "@/components/workstation/ProjectsPanel";
+import { ArtifactsPanel } from "@/components/workstation/ArtifactsPanel";
 import { ThoughtsPanel } from "@/components/workstation/ThoughtsPanel";
+import { Whiteboard } from "@/components/workstation/Whiteboard";
 import { ProfilePanel } from "@/components/settings/ProfilePanel";
 import { IntegrationsPanel } from "@/components/settings/IntegrationsPanel";
 import { PreferencesPanel } from "@/components/settings/PreferencesPanel";
 import { cn } from "@/lib/cn";
 
 type WorkstationSection = "Projects" | "Thoughts" | "Artifacts";
-
-const secondarySections: WorkstationSection[] = ["Artifacts"];
 
 function EmptyState() {
   return (
@@ -55,53 +53,21 @@ function TimeView() {
   );
 }
 
-interface SimpleAccordionPanelProps {
-  label: WorkstationSection;
-  index?: number;
-  isOpen: boolean;
-  onToggle: () => void;
-  expandSize?: "fill" | "limited";
-  className?: string;
-}
-
-function SimpleAccordionPanel({
-  label,
-  index = 0,
-  isOpen,
-  onToggle,
-  expandSize = "fill",
-  className,
-}: SimpleAccordionPanelProps) {
-  const headerAction = (
-    <button
-      type="button"
-      aria-label={`Add to ${label}`}
-      className="flex h-6 w-6 items-center justify-center rounded-[6px] text-[var(--color-pumice)] transition-colors duration-200 hover:bg-[var(--color-ash)] hover:text-[var(--color-steam)]"
-    >
-      <Plus size={16} strokeWidth={1.5} />
-    </button>
-  );
-
-  return (
-    <AccordionPanel
-      label={label}
-      index={index}
-      isOpen={isOpen}
-      onToggle={onToggle}
-      headerAction={isOpen ? headerAction : undefined}
-      expandSize={expandSize}
-      className={className}
-    />
-  );
-}
-
 function WorkstationView() {
   const [openSection, setOpenSection] = useState<WorkstationSection | null>(
     null
   );
+  const [activeArtifactId, setActiveArtifactId] = useState<string | null>(null);
+  const [whiteboardRefreshKey, setWhiteboardRefreshKey] = useState(0);
+  const [projectsRefreshKey, setProjectsRefreshKey] = useState(0);
 
   const handleToggle = (section: WorkstationSection) => {
     setOpenSection((current) => (current === section ? null : section));
+  };
+
+  const handleOpenArtifact = (artifactId: string) => {
+    setActiveArtifactId(artifactId);
+    setWhiteboardRefreshKey((current) => current + 1);
   };
 
   return (
@@ -111,23 +77,32 @@ function WorkstationView() {
           index={0}
           isOpen={openSection === "Projects"}
           onToggle={() => handleToggle("Projects")}
+          onProjectsChange={() =>
+            setProjectsRefreshKey((current) => current + 1)
+          }
         />
-        {secondarySections.map((label, index) => (
-          <SimpleAccordionPanel
-            key={label}
-            label={label}
-            index={index + 1}
-            isOpen={openSection === label}
-            onToggle={() => handleToggle(label)}
-          />
-        ))}
+        <ArtifactsPanel
+          index={1}
+          isOpen={openSection === "Artifacts"}
+          onToggle={() => handleToggle("Artifacts")}
+          onOpenArtifact={handleOpenArtifact}
+          refreshKey={whiteboardRefreshKey}
+          projectsRefreshKey={projectsRefreshKey}
+        />
         <ThoughtsPanel
           index={2}
           isOpen={openSection === "Thoughts"}
           onToggle={() => handleToggle("Thoughts")}
+          onThoughtSaved={handleOpenArtifact}
+          projectsRefreshKey={projectsRefreshKey}
         />
       </div>
-      <Panel label="Whiteboard" index={3} className="min-h-0 h-full" />
+      <Whiteboard
+        artifactId={activeArtifactId}
+        refreshKey={whiteboardRefreshKey}
+        onClose={() => setActiveArtifactId(null)}
+        index={3}
+      />
     </div>
   );
 }

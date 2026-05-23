@@ -14,7 +14,7 @@ export async function GET() {
       orderBy: { updatedAt: "desc" },
       include: {
         _count: {
-          select: { notes: true, artifacts: true },
+          select: { artifacts: true },
         },
       },
     });
