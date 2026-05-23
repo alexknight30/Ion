@@ -12,3 +12,13 @@ export function formatThoughtTimestamp(value: string | Date) {
 
   return `${datePart} - ${timePart}`;
 }
+
+export function wasThoughtEdited(note: {
+  createdAt: string;
+  updatedAt: string;
+}) {
+  return (
+    new Date(note.updatedAt).getTime() >
+    new Date(note.createdAt).getTime() + 1000
+  );
+}

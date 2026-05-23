@@ -40,7 +40,7 @@ export function PreferencesPanel() {
   });
 
   return (
-    <SettingsSection label="Preferences" index={2}>
+    <SettingsSection label="Preferences" index={3}>
       <div className="flex flex-col divide-y divide-[var(--color-border-subtle)]">
         {PREFERENCES.map(({ id, label, description }) => (
           <div

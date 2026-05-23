@@ -1,16 +1,21 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { X } from "lucide-react";
 import { Surface } from "@/components/ui/Surface";
 import { Label } from "@/components/ui/Label";
-import { cn } from "@/lib/cn";
 import {
   getArtifactDisplayTitle,
   THOUGHTS_JOURNAL_KIND,
 } from "@/lib/artifact-constants";
-import { fetchArtifact, updateArtifact, type Artifact } from "@/lib/artifacts";
-import { formatThoughtTimestamp } from "@/lib/format";
+import {
+  fetchArtifact,
+  updateArtifact,
+  type Artifact,
+  type ThoughtNote,
+} from "@/lib/artifacts";
+import { formatThoughtTimestamp, wasThoughtEdited } from "@/lib/format";
+import { updateThought } from "@/lib/thoughts";
 
 interface WhiteboardProps {
   artifactId: string | null;
@@ -29,9 +34,108 @@ function EmptyState() {
   );
 }
 
-function ThoughtJournalView({ artifact }: { artifact: Artifact }) {
-  const notes = artifact.notes ?? [];
+function ThoughtEntry({
+  note,
+  onUpdate,
+}: {
+  note: ThoughtNote;
+  onUpdate: (noteId: string, content: string) => Promise<ThoughtNote>;
+}) {
+  const [content, setContent] = useState(note.content);
+  const [displayNote, setDisplayNote] = useState(note);
+  const saveTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastSavedContent = useRef(note.content);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
+  function adjustHeight() {
+    const element = textareaRef.current;
+    if (!element) return;
+    element.style.height = "auto";
+    element.style.height = `${element.scrollHeight}px`;
+  }
+
+  useEffect(() => {
+    setContent(note.content);
+    setDisplayNote(note);
+    lastSavedContent.current = note.content;
+  }, [note.id]);
+
+  useEffect(() => {
+    adjustHeight();
+  }, [content]);
+
+  useEffect(() => {
+    return () => {
+      if (saveTimeout.current) {
+        clearTimeout(saveTimeout.current);
+      }
+    };
+  }, []);
+
+  async function persist(value: string) {
+    if (value === lastSavedContent.current) return;
+
+    try {
+      const updated = await onUpdate(note.id, value);
+      lastSavedContent.current = updated.content;
+      setDisplayNote(updated);
+    } catch {
+      // Parent surfaces save errors.
+    }
+  }
+
+  function handleChange(value: string) {
+    setContent(value);
+
+    if (saveTimeout.current) {
+      clearTimeout(saveTimeout.current);
+    }
+
+    saveTimeout.current = setTimeout(() => {
+      void persist(value);
+    }, 500);
+  }
+
+  function handleBlur() {
+    if (saveTimeout.current) {
+      clearTimeout(saveTimeout.current);
+      saveTimeout.current = null;
+    }
+
+    void persist(content);
+  }
+
+  return (
+    <article className="flex flex-col gap-2">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+        <h3 className="text-[12px] font-medium tracking-[-0.01em] text-[var(--color-pumice)]">
+          [{formatThoughtTimestamp(displayNote.createdAt)}]
+        </h3>
+        {wasThoughtEdited(displayNote) ? (
+          <span className="text-[12px] font-medium tracking-[-0.01em] text-[var(--color-steam)]">
+            [Edited {formatThoughtTimestamp(displayNote.updatedAt)}]
+          </span>
+        ) : null}
+      </div>
+      <textarea
+        ref={textareaRef}
+        value={content}
+        onChange={(event) => handleChange(event.target.value)}
+        onBlur={handleBlur}
+        rows={1}
+        className="w-full resize-none overflow-hidden bg-transparent text-[14px] leading-[1.6] tracking-[-0.01em] text-[var(--color-bone)] outline-none placeholder:text-[var(--color-pumice)]"
+      />
+    </article>
+  );
+}
+
+function ThoughtJournalView({
+  notes,
+  onNoteUpdate,
+}: {
+  notes: ThoughtNote[];
+  onNoteUpdate: (noteId: string, content: string) => Promise<ThoughtNote>;
+}) {
   if (notes.length === 0) {
     return (
       <div className="flex flex-1 items-center justify-center">
@@ -45,14 +149,7 @@ function ThoughtJournalView({ artifact }: { artifact: Artifact }) {
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto pr-1">
       {notes.map((note) => (
-        <article key={note.id} className="flex flex-col gap-2">
-          <h3 className="text-[12px] font-medium tracking-[-0.01em] text-[var(--color-pumice)]">
-            [{formatThoughtTimestamp(note.createdAt)}]
-          </h3>
-          <p className="whitespace-pre-wrap text-[14px] leading-[1.6] tracking-[-0.01em] text-[var(--color-bone)]">
-            {note.content}
-          </p>
-        </article>
+        <ThoughtEntry key={note.id} note={note} onUpdate={onNoteUpdate} />
       ))}
     </div>
   );
@@ -130,6 +227,25 @@ export function Whiteboard({
     }
   }
 
+  async function handleNoteUpdate(noteId: string, content: string) {
+    try {
+      const updated = await updateThought(noteId, content);
+      setArtifact((current) => {
+        if (!current?.notes) return current;
+        return {
+          ...current,
+          notes: current.notes.map((note) =>
+            note.id === noteId ? updated : note
+          ),
+        };
+      });
+      return updated;
+    } catch {
+      setError("Could not save changes.");
+      throw new Error("Failed to update thought");
+    }
+  }
+
   const isJournal = artifact?.kind === THOUGHTS_JOURNAL_KIND;
   const displayTitle = artifact ? getArtifactDisplayTitle(artifact) : null;
 
@@ -164,7 +280,10 @@ export function Whiteboard({
         {artifactId && !loading && artifact && !error && (
           <div className="flex min-h-0 flex-1 flex-col">
             {isJournal ? (
-              <ThoughtJournalView artifact={artifact} />
+              <ThoughtJournalView
+                notes={artifact.notes ?? []}
+                onNoteUpdate={handleNoteUpdate}
+              />
             ) : (
               <TextArtifactView
                 artifact={artifact}

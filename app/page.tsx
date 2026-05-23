@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { Navbar, type Tab } from "@/components/Navbar";
 import { AgentButton } from "@/components/AgentButton";
 import { Surface } from "@/components/ui/Surface";
@@ -10,9 +10,10 @@ import { ArtifactsPanel } from "@/components/workstation/ArtifactsPanel";
 import { ThoughtsPanel } from "@/components/workstation/ThoughtsPanel";
 import { Whiteboard } from "@/components/workstation/Whiteboard";
 import { ProfilePanel } from "@/components/settings/ProfilePanel";
+import { AgentPanel } from "@/components/settings/AgentPanel";
 import { IntegrationsPanel } from "@/components/settings/IntegrationsPanel";
 import { PreferencesPanel } from "@/components/settings/PreferencesPanel";
-import { cn } from "@/lib/cn";
+import { CalendarPanel } from "@/components/time/CalendarPanel";
 
 type WorkstationSection = "Projects" | "Thoughts" | "Artifacts";
 
@@ -43,10 +44,10 @@ function Panel({ label, index = 0, className }: PanelProps) {
 
 function TimeView() {
   return (
-    <div className="grid h-full min-h-0 gap-6 md:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+    <div className="grid h-full min-h-0 gap-6 md:grid-cols-[minmax(0,7fr)_minmax(0,3fr)]">
       <div className="flex min-h-0 flex-col gap-6">
-        <Panel label="Calendar" index={0} className="min-h-0 flex-1" />
-        <Panel label="Schedule" index={2} className="min-h-0 flex-[0.65]" />
+        <CalendarPanel index={0} className="min-h-0 flex-[1.35]" />
+        <Panel label="Inbox" index={2} className="min-h-0 flex-[0.45]" />
       </div>
       <Panel label="To-Do List" index={1} className="min-h-0 h-full" />
     </div>
@@ -111,39 +112,56 @@ function WorkstationView() {
   );
 }
 
+function ChatView() {
+  return (
+    <div className="flex h-full min-h-0 flex-col">
+      <Panel label="Chat" index={0} className="min-h-0 flex-1" />
+    </div>
+  );
+}
+
 function SettingsView() {
   return (
     <div className="flex flex-col gap-6">
       <ProfilePanel />
+      <AgentPanel />
       <IntegrationsPanel />
       <PreferencesPanel />
     </div>
   );
 }
 
-const views: Record<Tab, () => React.ReactNode> = {
-  Time: TimeView,
-  Workstation: WorkstationView,
-  Settings: SettingsView,
+const views: Record<Tab, ReactNode> = {
+  Time: <TimeView />,
+  Workstation: <WorkstationView />,
+  Chat: <ChatView />,
+  Settings: <SettingsView />,
+};
+
+const tabLayout: Record<Tab, string> = {
+  Time: "h-full min-h-0 pl-6 pr-8 md:pl-8",
+  Workstation: "h-full min-h-0 pl-6 pr-8 md:pl-8",
+  Chat: "h-full min-h-0 pl-6 pr-8 md:pl-8",
+  Settings:
+    "mx-auto h-full min-h-0 w-full max-w-6xl overflow-y-auto px-8",
 };
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState<Tab>("Time");
-  const ActiveView = views[activeTab];
 
   return (
     <div className="flex h-dvh flex-col overflow-hidden">
       <Navbar activeTab={activeTab} onTabChange={setActiveTab} />
-      <main
-        className={cn(
-          "min-h-0 flex-1 pt-[60px] pb-6",
-          activeTab === "Settings" ? "overflow-y-auto" : "overflow-hidden",
-          activeTab === "Time" || activeTab === "Workstation"
-            ? "pl-6 pr-8 md:pl-8"
-            : "mx-auto w-full max-w-6xl px-8"
-        )}
-      >
-        <ActiveView />
+      <main className="min-h-0 flex-1 overflow-hidden pt-[60px] pb-6">
+        {(Object.keys(views) as Tab[]).map((tab) => (
+          <div
+            key={tab}
+            hidden={activeTab !== tab}
+            className={tabLayout[tab]}
+          >
+            {views[tab]}
+          </div>
+        ))}
       </main>
       <AgentButton />
     </div>

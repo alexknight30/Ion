@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { ChevronUp, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/cn";
 
-const tabs = ["Time", "Workstation", "Settings"] as const;
+const tabs = ["Time", "Workstation", "Chat", "Settings"] as const;
 export type Tab = (typeof tabs)[number];
 
 interface NavbarProps {

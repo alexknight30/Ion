@@ -21,3 +21,20 @@ export async function createThought(
 
   return response.json();
 }
+
+export async function updateThought(
+  noteId: string,
+  content: string
+): Promise<ThoughtNote> {
+  const response = await fetch(`/api/notes/${noteId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ content }),
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to update thought");
+  }
+
+  return response.json();
+}
