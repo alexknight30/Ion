@@ -8,11 +8,14 @@ import { Surface } from "@/components/ui/Surface";
 import { Label } from "@/components/ui/Label";
 import { AccordionPanel } from "@/components/workstation/AccordionPanel";
 import { ProjectsPanel } from "@/components/workstation/ProjectsPanel";
+import { ProfilePanel } from "@/components/settings/ProfilePanel";
+import { IntegrationsPanel } from "@/components/settings/IntegrationsPanel";
+import { PreferencesPanel } from "@/components/settings/PreferencesPanel";
 import { cn } from "@/lib/cn";
 
 type WorkstationSection = "Projects" | "Thoughts" | "Artifacts";
 
-const secondarySections: WorkstationSection[] = ["Thoughts", "Artifacts"];
+const secondarySections: WorkstationSection[] = ["Artifacts", "Thoughts"];
 
 function EmptyState() {
   return (
@@ -119,9 +122,10 @@ function WorkstationView() {
 
 function SettingsView() {
   return (
-    <div className="grid h-full min-h-0 gap-6 md:grid-cols-2">
-      <Panel label="Integrations" index={0} className="min-h-0" />
-      <Panel label="Preferences" index={1} className="min-h-0" />
+    <div className="flex flex-col gap-6">
+      <ProfilePanel />
+      <IntegrationsPanel />
+      <PreferencesPanel />
     </div>
   );
 }
@@ -141,7 +145,8 @@ export default function Home() {
       <Navbar activeTab={activeTab} onTabChange={setActiveTab} />
       <main
         className={cn(
-          "min-h-0 flex-1 overflow-hidden pt-[60px] pb-6",
+          "min-h-0 flex-1 pt-[60px] pb-6",
+          activeTab === "Settings" ? "overflow-y-auto" : "overflow-hidden",
           activeTab === "Time" || activeTab === "Workstation"
             ? "pl-6 pr-8 md:pl-8"
             : "mx-auto w-full max-w-6xl px-8"

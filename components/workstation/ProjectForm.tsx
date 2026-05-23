@@ -6,12 +6,21 @@ import {
   PROJECT_COLORS,
   WORK_TYPES,
   type CreateProjectInput,
+  type Project,
   type WorkType,
 } from "@/lib/projects";
 
 interface ProjectFormProps {
+  project?: Project;
   onSave: (input: CreateProjectInput) => Promise<void>;
   onCancel: () => void;
+}
+
+function getInitialWorkType(project?: Project): WorkType | null {
+  if (project?.workType && WORK_TYPES.includes(project.workType as WorkType)) {
+    return project.workType as WorkType;
+  }
+  return null;
 }
 
 function FieldLabel({ children }: { children: React.ReactNode }) {
@@ -25,11 +34,15 @@ function FieldLabel({ children }: { children: React.ReactNode }) {
 const inputClassName =
   "w-full rounded-[8px] border border-[var(--color-border-subtle)] bg-[var(--color-obsidian)] px-3 py-2 text-[14px] text-[var(--color-bone)] outline-none transition-[border-color,box-shadow] duration-200 placeholder:text-[var(--color-pumice)] focus:border-[var(--color-border-active)] focus:shadow-[0_0_0_3px_rgba(0,0,0,0.04)]";
 
-export function ProjectForm({ onSave, onCancel }: ProjectFormProps) {
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [workType, setWorkType] = useState<WorkType | null>(null);
-  const [color, setColor] = useState<string>(PROJECT_COLORS[5].value);
+export function ProjectForm({ project, onSave, onCancel }: ProjectFormProps) {
+  const [title, setTitle] = useState(project?.name ?? "");
+  const [description, setDescription] = useState(project?.description ?? "");
+  const [workType, setWorkType] = useState<WorkType | null>(() =>
+    getInitialWorkType(project)
+  );
+  const [color, setColor] = useState<string>(
+    project?.color ?? PROJECT_COLORS[5].value
+  );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -54,7 +67,11 @@ export function ProjectForm({ onSave, onCancel }: ProjectFormProps) {
       });
       onCancel();
     } catch {
-      setError("Could not save project. Try again.");
+      setError(
+        project
+          ? "Could not update project. Try again."
+          : "Could not save project. Try again."
+      );
     } finally {
       setSaving(false);
     }

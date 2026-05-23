@@ -10,6 +10,7 @@ import {
   createProject,
   deleteProject,
   fetchProjects,
+  updateProject,
   type CreateProjectInput,
   type Project,
 } from "@/lib/projects";
@@ -20,11 +21,18 @@ interface ProjectsPanelProps {
   onToggle: () => void;
 }
 
+type SwipeAction = {
+  projectId: string;
+  type: "delete" | "edit";
+};
+
 export function ProjectsPanel({ index = 0, isOpen, onToggle }: ProjectsPanelProps) {
   const [projects, setProjects] = useState<Project[]>([]);
   const [showForm, setShowForm] = useState(false);
+  const [editingProject, setEditingProject] = useState<Project | null>(null);
   const [loading, setLoading] = useState(true);
-  const [revealedProjectId, setRevealedProjectId] = useState<string | null>(null);
+  const [expandedProjectId, setExpandedProjectId] = useState<string | null>(null);
+  const [swipeAction, setSwipeAction] = useState<SwipeAction | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -50,8 +58,9 @@ export function ProjectsPanel({ index = 0, isOpen, onToggle }: ProjectsPanelProp
 
   useEffect(() => {
     if (!isOpen) {
-      setShowForm(false);
-      setRevealedProjectId(null);
+      closeForm();
+      setExpandedProjectId(null);
+      setSwipeAction(null);
     }
   }, [isOpen]);
 
@@ -60,14 +69,16 @@ export function ProjectsPanel({ index = 0, isOpen, onToggle }: ProjectsPanelProp
       const target = event.target;
       if (!(target instanceof Node)) return;
       if (!listRef.current?.contains(target)) {
-        setRevealedProjectId(null);
+        setSwipeAction(null);
         return;
       }
-      if (
-        target instanceof Element &&
-        target.closest("[data-project-delete]")
-      ) {
-        return;
+      if (target instanceof Element) {
+        if (
+          target.closest("[data-project-delete]") ||
+          target.closest("[data-project-edit]")
+        ) {
+          return;
+        }
       }
     }
 
@@ -75,22 +86,54 @@ export function ProjectsPanel({ index = 0, isOpen, onToggle }: ProjectsPanelProp
     return () => document.removeEventListener("pointerdown", handlePointerDown);
   }, []);
 
+  function closeForm() {
+    setShowForm(false);
+    setEditingProject(null);
+  }
+
+  function openCreateForm() {
+    setEditingProject(null);
+    setShowForm(true);
+    setSwipeAction(null);
+    setExpandedProjectId(null);
+  }
+
+  function openEditForm(project: Project) {
+    setEditingProject(project);
+    setShowForm(true);
+    setSwipeAction(null);
+    setExpandedProjectId(null);
+  }
+
   async function handleSave(input: CreateProjectInput) {
-    const project = await createProject(input);
-    setProjects((current) => [project, ...current]);
+    if (editingProject) {
+      const updated = await updateProject(editingProject.id, input);
+      setProjects((current) =>
+        current.map((project) =>
+          project.id === updated.id ? updated : project
+        )
+      );
+    } else {
+      const project = await createProject(input);
+      setProjects((current) => [project, ...current]);
+    }
+    closeForm();
   }
 
   async function handleDelete(id: string) {
     await deleteProject(id);
     setProjects((current) => current.filter((project) => project.id !== id));
-    setRevealedProjectId((current) => (current === id ? null : current));
+    setSwipeAction((current) =>
+      current?.projectId === id ? null : current
+    );
+    setExpandedProjectId((current) => (current === id ? null : current));
   }
 
   const headerAction = (
     <button
       type="button"
       aria-label={showForm ? "Close project form" : "Add project"}
-      onClick={() => setShowForm((current) => !current)}
+      onClick={() => (showForm ? closeForm() : openCreateForm())}
       className="flex h-6 w-6 items-center justify-center rounded-[6px] text-[var(--color-pumice)] transition-colors duration-200 hover:bg-[var(--color-ash)] hover:text-[var(--color-steam)]"
     >
       {showForm ? (
@@ -112,8 +155,10 @@ export function ProjectsPanel({ index = 0, isOpen, onToggle }: ProjectsPanelProp
     >
       {showForm ? (
         <ProjectForm
+          key={editingProject?.id ?? "create"}
+          project={editingProject ?? undefined}
           onSave={handleSave}
-          onCancel={() => setShowForm(false)}
+          onCancel={closeForm}
         />
       ) : (
         <div ref={listRef} className="flex min-h-0 flex-1 flex-col">
@@ -123,12 +168,35 @@ export function ProjectsPanel({ index = 0, isOpen, onToggle }: ProjectsPanelProp
                 <ProjectRow
                   key={project.id}
                   project={project}
-                  isRevealed={revealedProjectId === project.id}
-                  onReveal={() => setRevealedProjectId(project.id)}
-                  onClose={() => setRevealedProjectId(null)}
+                  isExpanded={expandedProjectId === project.id}
+                  onToggleExpand={() => {
+                    setExpandedProjectId((current) =>
+                      current === project.id ? null : project.id
+                    );
+                    setSwipeAction(null);
+                  }}
+                  isDeleteRevealed={
+                    swipeAction?.projectId === project.id &&
+                    swipeAction.type === "delete"
+                  }
+                  isEditRevealed={
+                    swipeAction?.projectId === project.id &&
+                    swipeAction.type === "edit"
+                  }
+                  onRevealDelete={() =>
+                    setSwipeAction({ projectId: project.id, type: "delete" })
+                  }
+                  onRevealEdit={() =>
+                    setSwipeAction({ projectId: project.id, type: "edit" })
+                  }
+                  onCloseActions={() => setSwipeAction(null)}
                   onDelete={handleDelete}
+                  onEdit={openEditForm}
                   onInteractionStart={() => {
-                    setRevealedProjectId((current) =>
+                    setSwipeAction((current) =>
+                      current?.projectId === project.id ? current : null
+                    );
+                    setExpandedProjectId((current) =>
                       current === project.id ? current : null
                     );
                   }}
