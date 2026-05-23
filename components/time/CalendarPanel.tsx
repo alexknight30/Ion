@@ -46,10 +46,10 @@ export function CalendarPanel({ index = 0, className }: CalendarPanelProps) {
   }
 
   return (
-    <Surface index={index} className={cn("flex min-h-0 flex-col", className)}>
+    <Surface index={index} className={cn("flex shrink-0 flex-col", className)}>
       <Label>Calendar</Label>
 
-      <div className="mt-5 flex min-h-0 flex-1 flex-col">
+      <div className="mt-5 flex flex-col">
         <div className="mb-4 flex items-center justify-between gap-3">
           <button
             type="button"
@@ -113,9 +113,11 @@ export function CalendarPanel({ index = 0, className }: CalendarPanelProps) {
                 }
                 className={cn(
                   "mx-auto flex h-9 w-9 items-center justify-center rounded-full text-[13px] tracking-[-0.01em] transition-[background-color,color,box-shadow] duration-200",
-                  isToday || isSelected
+                  isSelected
                     ? "bg-[var(--color-ash)] text-[var(--color-glacier)]"
-                    : "text-[var(--color-bone)] hover:bg-[var(--color-ash)]"
+                    : isToday
+                      ? "text-[var(--color-glacier)] ring-1 ring-[var(--color-border-active)]"
+                      : "text-[var(--color-bone)] hover:bg-[var(--color-ash)]"
                 )}
               >
                 {day}

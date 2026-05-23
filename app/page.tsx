@@ -14,6 +14,7 @@ import { AgentPanel } from "@/components/settings/AgentPanel";
 import { IntegrationsPanel } from "@/components/settings/IntegrationsPanel";
 import { PreferencesPanel } from "@/components/settings/PreferencesPanel";
 import { CalendarPanel } from "@/components/time/CalendarPanel";
+import { ChatView } from "@/components/chat/ChatView";
 
 type WorkstationSection = "Projects" | "Thoughts" | "Artifacts";
 
@@ -46,8 +47,8 @@ function TimeView() {
   return (
     <div className="grid h-full min-h-0 gap-6 md:grid-cols-[minmax(0,7fr)_minmax(0,3fr)]">
       <div className="flex min-h-0 flex-col gap-6">
-        <CalendarPanel index={0} className="min-h-0 flex-[1.35]" />
-        <Panel label="Inbox" index={2} className="min-h-0 flex-[0.45]" />
+        <CalendarPanel index={0} className="shrink-0" />
+        <Panel label="Inbox" index={2} className="min-h-0 flex-1" />
       </div>
       <Panel label="To-Do List" index={1} className="min-h-0 h-full" />
     </div>
@@ -112,14 +113,6 @@ function WorkstationView() {
   );
 }
 
-function ChatView() {
-  return (
-    <div className="flex h-full min-h-0 flex-col">
-      <Panel label="Chat" index={0} className="min-h-0 flex-1" />
-    </div>
-  );
-}
-
 function SettingsView() {
   return (
     <div className="flex flex-col gap-6">
@@ -163,7 +156,7 @@ export default function Home() {
           </div>
         ))}
       </main>
-      <AgentButton />
+      {activeTab !== "Chat" ? <AgentButton /> : null}
     </div>
   );
 }
