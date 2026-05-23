@@ -33,3 +33,9 @@ export async function updateProfile(input: UpdateProfileInput): Promise<Profile>
 
   return response.json();
 }
+
+export function getFirstName(name: string): string {
+  const trimmed = name.trim();
+  if (!trimmed) return "";
+  return trimmed.split(/\s+/)[0] ?? "";
+}

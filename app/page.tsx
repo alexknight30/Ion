@@ -8,6 +8,7 @@ import { Surface } from "@/components/ui/Surface";
 import { Label } from "@/components/ui/Label";
 import { AccordionPanel } from "@/components/workstation/AccordionPanel";
 import { ProjectsPanel } from "@/components/workstation/ProjectsPanel";
+import { ThoughtsPanel } from "@/components/workstation/ThoughtsPanel";
 import { ProfilePanel } from "@/components/settings/ProfilePanel";
 import { IntegrationsPanel } from "@/components/settings/IntegrationsPanel";
 import { PreferencesPanel } from "@/components/settings/PreferencesPanel";
@@ -15,7 +16,7 @@ import { cn } from "@/lib/cn";
 
 type WorkstationSection = "Projects" | "Thoughts" | "Artifacts";
 
-const secondarySections: WorkstationSection[] = ["Artifacts", "Thoughts"];
+const secondarySections: WorkstationSection[] = ["Artifacts"];
 
 function EmptyState() {
   return (
@@ -118,9 +119,13 @@ function WorkstationView() {
             index={index + 1}
             isOpen={openSection === label}
             onToggle={() => handleToggle(label)}
-            expandSize={label === "Thoughts" ? "limited" : "fill"}
           />
         ))}
+        <ThoughtsPanel
+          index={2}
+          isOpen={openSection === "Thoughts"}
+          onToggle={() => handleToggle("Thoughts")}
+        />
       </div>
       <Panel label="Whiteboard" index={3} className="min-h-0 h-full" />
     </div>

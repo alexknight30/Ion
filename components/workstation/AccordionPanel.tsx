@@ -66,7 +66,8 @@ export function AccordionPanel({
           <div
             className={cn(
               "flex h-full min-h-0 flex-col",
-              scrollContent ? "overflow-y-auto" : "overflow-hidden"
+              scrollContent ? "overflow-y-auto" : "overflow-hidden",
+              !isOpen && "invisible opacity-0"
             )}
           >
             {children}
