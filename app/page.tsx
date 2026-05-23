@@ -48,17 +48,25 @@ function Panel({ label, index = 0, className }: PanelProps) {
 
 function OrganizeView() {
   const [selectedDate, setSelectedDate] = useState(getTodayDate);
+  const [inboxExpanded, setInboxExpanded] = useState(false);
 
   return (
     <div className="grid h-full min-h-0 gap-6 md:grid-cols-[minmax(0,7fr)_minmax(0,3fr)]">
       <div className="flex min-h-0 flex-col gap-6">
-        <CalendarPanel
-          selectedDate={selectedDate}
-          onSelectDate={setSelectedDate}
-          index={0}
-          className="shrink-0"
+        {!inboxExpanded && (
+          <CalendarPanel
+            selectedDate={selectedDate}
+            onSelectDate={setSelectedDate}
+            index={0}
+            className="shrink-0"
+          />
+        )}
+        <InboxPanel
+          index={2}
+          className="min-h-0 flex-1"
+          expanded={inboxExpanded}
+          onToggleExpanded={() => setInboxExpanded((current) => !current)}
         />
-        <InboxPanel index={2} className="min-h-0 flex-1" />
       </div>
       <TodoListPanel
         selectedDate={selectedDate}

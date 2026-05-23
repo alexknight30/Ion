@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Image from "next/image";
+import { ChevronDown, ChevronUp } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Surface } from "@/components/ui/Surface";
 import { Label } from "@/components/ui/Label";
@@ -130,6 +131,8 @@ const ease = [0.16, 1, 0.3, 1] as const;
 interface InboxPanelProps {
   index?: number;
   className?: string;
+  expanded?: boolean;
+  onToggleExpanded?: () => void;
 }
 
 function SourceButton({
@@ -312,7 +315,12 @@ function InboxMessageList({ source }: { source: InboxSource }) {
   );
 }
 
-export function InboxPanel({ index = 2, className }: InboxPanelProps) {
+export function InboxPanel({
+  index = 2,
+  className,
+  expanded = false,
+  onToggleExpanded,
+}: InboxPanelProps) {
   const [source, setSource] = useState<InboxSource>("gmail");
 
   return (
@@ -322,15 +330,32 @@ export function InboxPanel({ index = 2, className }: InboxPanelProps) {
     >
       <div className="mb-4 flex items-center justify-between gap-4">
         <Label>Inbox</Label>
-        <div className="flex items-center gap-0.5">
-          {INBOX_SOURCES.map((option) => (
-            <SourceButton
-              key={option.id}
-              source={option}
-              selected={source === option.id}
-              onSelect={() => setSource(option.id)}
-            />
-          ))}
+        <div className="flex items-center gap-1">
+          <div className="flex items-center gap-0.5">
+            {INBOX_SOURCES.map((option) => (
+              <SourceButton
+                key={option.id}
+                source={option}
+                selected={source === option.id}
+                onSelect={() => setSource(option.id)}
+              />
+            ))}
+          </div>
+          {onToggleExpanded ? (
+            <button
+              type="button"
+              onClick={onToggleExpanded}
+              aria-label={expanded ? "Show calendar" : "Expand inbox"}
+              aria-pressed={expanded}
+              className="-translate-y-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-[6px] text-[var(--color-pumice)] transition-colors duration-200 hover:bg-[var(--color-ash)] hover:text-[var(--color-steam)]"
+            >
+              {expanded ? (
+                <ChevronDown size={16} strokeWidth={1.5} />
+              ) : (
+                <ChevronUp size={16} strokeWidth={1.5} />
+              )}
+            </button>
+          ) : null}
         </div>
       </div>
 
