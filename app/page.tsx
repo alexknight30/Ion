@@ -80,6 +80,9 @@ function WorkstationView() {
           onProjectsChange={() =>
             setProjectsRefreshKey((current) => current + 1)
           }
+          onOpenArtifact={handleOpenArtifact}
+          artifactsRefreshKey={whiteboardRefreshKey}
+          projectsRefreshKey={projectsRefreshKey}
         />
         <ArtifactsPanel
           index={1}
@@ -95,6 +98,7 @@ function WorkstationView() {
           onToggle={() => handleToggle("Thoughts")}
           onThoughtSaved={handleOpenArtifact}
           projectsRefreshKey={projectsRefreshKey}
+          artifactsRefreshKey={whiteboardRefreshKey}
         />
       </div>
       <Whiteboard

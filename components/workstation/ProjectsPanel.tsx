@@ -6,6 +6,11 @@ import { AccordionPanel } from "@/components/workstation/AccordionPanel";
 import { ProjectForm } from "@/components/workstation/ProjectForm";
 import { ProjectRow } from "@/components/workstation/ProjectRow";
 import { cn } from "@/lib/cn";
+import { fetchArtifacts, type Artifact } from "@/lib/artifacts";
+import {
+  getProjectListArtifacts,
+  getProjectThoughtJournal,
+} from "@/lib/artifact-select-options";
 import {
   createProject,
   deleteProject,
@@ -20,6 +25,9 @@ interface ProjectsPanelProps {
   isOpen: boolean;
   onToggle: () => void;
   onProjectsChange?: () => void;
+  onOpenArtifact?: (artifactId: string) => void;
+  artifactsRefreshKey?: number;
+  projectsRefreshKey?: number;
 }
 
 type SwipeAction = {
@@ -32,8 +40,12 @@ export function ProjectsPanel({
   isOpen,
   onToggle,
   onProjectsChange,
+  onOpenArtifact,
+  artifactsRefreshKey = 0,
+  projectsRefreshKey = 0,
 }: ProjectsPanelProps) {
   const [projects, setProjects] = useState<Project[]>([]);
+  const [artifacts, setArtifacts] = useState<Artifact[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
   const [loading, setLoading] = useState(true);
@@ -60,7 +72,28 @@ export function ProjectsPanel({
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [projectsRefreshKey]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    let cancelled = false;
+
+    async function loadArtifacts() {
+      try {
+        const data = await fetchArtifacts();
+        if (!cancelled) setArtifacts(data);
+      } catch {
+        if (!cancelled) setArtifacts([]);
+      }
+    }
+
+    loadArtifacts();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, artifactsRefreshKey, projectsRefreshKey]);
 
   useEffect(() => {
     if (!isOpen) {
@@ -176,6 +209,8 @@ export function ProjectsPanel({
                 <ProjectRow
                   key={project.id}
                   project={project}
+                  projectArtifacts={getProjectListArtifacts(artifacts, project.id)}
+                  thoughtJournal={getProjectThoughtJournal(artifacts, project.id)}
                   isExpanded={expandedProjectId === project.id}
                   onToggleExpand={() => {
                     setExpandedProjectId((current) =>
@@ -200,6 +235,7 @@ export function ProjectsPanel({
                   onCloseActions={() => setSwipeAction(null)}
                   onDelete={handleDelete}
                   onEdit={openEditForm}
+                  onOpenArtifact={(artifactId) => onOpenArtifact?.(artifactId)}
                   onInteractionStart={() => {
                     setSwipeAction((current) =>
                       current?.projectId === project.id ? current : null

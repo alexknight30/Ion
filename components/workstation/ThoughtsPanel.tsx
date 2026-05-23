@@ -1,12 +1,15 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AccordionPanel } from "@/components/workstation/AccordionPanel";
-import {
-  NO_PROJECT_VALUE,
-  ProjectSelect,
-} from "@/components/workstation/ProjectSelect";
+import { ArtifactSelect } from "@/components/workstation/ArtifactSelect";
 import { cn } from "@/lib/cn";
+import { fetchArtifacts, type Artifact } from "@/lib/artifacts";
+import {
+  buildThoughtDestinationOptions,
+  getProjectIdForOption,
+  MISC_THOUGHTS_OPTION_ID,
+} from "@/lib/artifact-select-options";
 import { fetchProfile, getFirstName } from "@/lib/profile";
 import { fetchProjects, type Project } from "@/lib/projects";
 import { createThought } from "@/lib/thoughts";
@@ -17,6 +20,7 @@ interface ThoughtsPanelProps {
   onToggle: () => void;
   onThoughtSaved: (artifactId: string) => void;
   projectsRefreshKey?: number;
+  artifactsRefreshKey?: number;
 }
 
 export function ThoughtsPanel({
@@ -25,14 +29,23 @@ export function ThoughtsPanel({
   onToggle,
   onThoughtSaved,
   projectsRefreshKey = 0,
+  artifactsRefreshKey = 0,
 }: ThoughtsPanelProps) {
   const [content, setContent] = useState("");
+  const [artifacts, setArtifacts] = useState<Artifact[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
-  const [selectedProjectId, setSelectedProjectId] = useState(NO_PROJECT_VALUE);
+  const [selectedOptionId, setSelectedOptionId] = useState(
+    MISC_THOUGHTS_OPTION_ID
+  );
   const [firstName, setFirstName] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const thoughtOptions = useMemo(
+    () => buildThoughtDestinationOptions(artifacts, projects),
+    [artifacts, projects]
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -60,21 +73,41 @@ export function ThoughtsPanel({
 
     let cancelled = false;
 
-    async function loadProjects() {
+    async function loadData() {
       try {
-        const projectList = await fetchProjects();
-        if (!cancelled) setProjects(projectList);
+        const [artifactList, projectList] = await Promise.all([
+          fetchArtifacts(),
+          fetchProjects(),
+        ]);
+
+        if (cancelled) return;
+
+        setArtifacts(artifactList);
+        setProjects(projectList);
       } catch {
-        if (!cancelled) setProjects([]);
+        if (!cancelled) {
+          setArtifacts([]);
+          setProjects([]);
+        }
       }
     }
 
-    loadProjects();
+    loadData();
 
     return () => {
       cancelled = true;
     };
-  }, [isOpen, projectsRefreshKey]);
+  }, [isOpen, projectsRefreshKey, artifactsRefreshKey]);
+
+  useEffect(() => {
+    if (thoughtOptions.length === 0) return;
+
+    setSelectedOptionId((current) =>
+      thoughtOptions.some((option) => option.id === current)
+        ? current
+        : thoughtOptions[0].id
+    );
+  }, [thoughtOptions]);
 
   const placeholder = firstName
     ? `What's on your mind ${firstName}?`
@@ -87,8 +120,7 @@ export function ThoughtsPanel({
     setError(null);
 
     try {
-      const projectId =
-        selectedProjectId === NO_PROJECT_VALUE ? null : selectedProjectId;
+      const projectId = getProjectIdForOption(thoughtOptions, selectedOptionId);
       const result = await createThought(content, projectId);
       setContent("");
       onThoughtSaved(result.artifact.id);
@@ -125,14 +157,14 @@ export function ThoughtsPanel({
             <span className="text-[13px] text-[var(--color-ember)]">{error}</span>
           )}
           <div className="flex items-center gap-2">
-            <ProjectSelect
-              projects={projects}
-              value={selectedProjectId}
-              onChange={setSelectedProjectId}
+            <ArtifactSelect
+              options={thoughtOptions}
+              value={selectedOptionId}
+              onChange={setSelectedOptionId}
               disabled={loading}
-              showNoProject
-              noProjectLabel="No project"
-              ariaLabel="Assign thought to project"
+              placeholder="Select thought journal"
+              emptyLabel="No thought journals"
+              ariaLabel="Assign thought to journal"
             />
 
             <button
