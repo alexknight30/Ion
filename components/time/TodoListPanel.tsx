@@ -33,16 +33,19 @@ export function TodoListPanel({
   const [adding, setAdding] = useState(false);
   const [focusTodoId, setFocusTodoId] = useState<string | null>(null);
   const [deleteRevealedId, setDeleteRevealedId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const dateKey = toDateKey(selectedDate);
 
   const loadTodos = useCallback(async () => {
     setLoading(true);
+    setError(null);
     try {
       const data = await fetchTodos(dateKey);
       setTodos(data);
     } catch {
       setTodos([]);
+      setError("Could not load tasks.");
     } finally {
       setLoading(false);
     }
@@ -89,8 +92,9 @@ export function TodoListPanel({
       const todo = await createTodo({ date: dateKey, title: "" });
       setTodos((current) => [...current, todo]);
       setFocusTodoId(todo.id);
+      setError(null);
     } catch {
-      // Keep list unchanged on failure.
+      setError("Could not add task. Try restarting the dev server.");
     } finally {
       setAdding(false);
     }
@@ -146,7 +150,11 @@ export function TodoListPanel({
       </div>
 
       <div className="mt-5 min-h-0 flex-1 overflow-y-auto">
-        {loading ? (
+        {error ? (
+          <div className="flex flex-1 items-center justify-center py-8">
+            <span className="text-[13px] text-[var(--color-ember)]">{error}</span>
+          </div>
+        ) : loading ? (
           <div className="flex flex-1 items-center justify-center py-8">
             <span className="text-[13px] text-[var(--color-pumice)]">Loading…</span>
           </div>

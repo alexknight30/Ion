@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Check } from "lucide-react";
 import { cn } from "@/lib/cn";
 import type { Project } from "@/lib/projects";
@@ -22,91 +23,180 @@ function TodoProjectPicker({
   onChange,
 }: TodoProjectPickerProps) {
   const [open, setOpen] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
+  const [menuPosition, setMenuPosition] = useState<{
+    top: number;
+    left: number;
+    width: number;
+  } | null>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
   const selectedProject = projects.find((project) => project.id === projectId);
 
   useEffect(() => {
+    if (!open || !buttonRef.current) {
+      setMenuPosition(null);
+      return;
+    }
+
+    function updatePosition() {
+      if (!buttonRef.current) return;
+      const rect = buttonRef.current.getBoundingClientRect();
+      const width = 200;
+      setMenuPosition({
+        top: rect.bottom + 6,
+        left: Math.max(8, rect.right - width),
+        width,
+      });
+    }
+
+    updatePosition();
+    window.addEventListener("resize", updatePosition);
+    window.addEventListener("scroll", updatePosition, true);
+
+    return () => {
+      window.removeEventListener("resize", updatePosition);
+      window.removeEventListener("scroll", updatePosition, true);
+    };
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+
     function handlePointerDown(event: PointerEvent) {
-      if (!containerRef.current?.contains(event.target as Node)) {
-        setOpen(false);
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+
+      if (
+        buttonRef.current?.contains(target) ||
+        target.closest("[data-todo-project-menu]")
+      ) {
+        return;
       }
+
+      setOpen(false);
     }
 
     document.addEventListener("pointerdown", handlePointerDown);
     return () => document.removeEventListener("pointerdown", handlePointerDown);
-  }, []);
+  }, [open]);
+
+  function stopRowInteraction(event: React.SyntheticEvent) {
+    event.stopPropagation();
+  }
+
+  function selectProject(nextProjectId: string | null) {
+    onChange(nextProjectId);
+    setOpen(false);
+  }
+
+  function handleMenuPointerDown(
+    event: React.PointerEvent<HTMLButtonElement>,
+    nextProjectId: string | null
+  ) {
+    event.preventDefault();
+    event.stopPropagation();
+    selectProject(nextProjectId);
+  }
+
+  const menu =
+    open && menuPosition
+      ? createPortal(
+          <ul
+            data-todo-project-menu
+            role="listbox"
+            aria-label="Projects"
+            onMouseDown={(event) => event.preventDefault()}
+            style={{
+              top: menuPosition.top,
+              left: menuPosition.left,
+              width: menuPosition.width,
+            }}
+            className="fixed z-[100] max-h-48 overflow-y-auto rounded-[8px] border border-[var(--color-border-subtle)] bg-[var(--color-obsidian)] py-1 shadow-[0_4px_24px_var(--color-shadow-soft)]"
+          >
+            <li role="option" aria-selected={projectId === null}>
+              <button
+                type="button"
+                onPointerDown={(event) => handleMenuPointerDown(event, null)}
+                className={cn(
+                  "flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-[13px] text-[var(--color-bone)] transition-colors duration-200 hover:bg-[var(--color-ash)]",
+                  projectId === null && "bg-[var(--color-ash)]"
+                )}
+              >
+                <span>No project</span>
+                <span className="h-3 w-3 rounded-full border border-[var(--color-frost)]" />
+              </button>
+            </li>
+            {projects.length === 0 ? (
+              <li className="px-3 py-2 text-[12px] text-[var(--color-pumice)]">
+                Create a project in Workstation first.
+              </li>
+            ) : (
+              projects.map((project) => (
+                <li
+                  key={project.id}
+                  role="option"
+                  aria-selected={project.id === projectId}
+                >
+                  <button
+                    type="button"
+                    onPointerDown={(event) =>
+                      handleMenuPointerDown(event, project.id)
+                    }
+                    className={cn(
+                      "flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-[13px] text-[var(--color-bone)] transition-colors duration-200 hover:bg-[var(--color-ash)]",
+                      project.id === projectId && "bg-[var(--color-ash)]"
+                    )}
+                  >
+                    <span className="truncate">{project.name}</span>
+                    {project.color ? (
+                      <span
+                        className="h-3 w-3 shrink-0 rounded-full"
+                        style={{ backgroundColor: project.color }}
+                      />
+                    ) : (
+                      <span className="h-3 w-3 shrink-0 rounded-full border border-[var(--color-frost)]" />
+                    )}
+                  </button>
+                </li>
+              ))
+            )}
+          </ul>,
+          document.body
+        )
+      : null;
 
   return (
-    <div ref={containerRef} className="relative shrink-0">
+    <div
+      data-todo-project-picker
+      className="shrink-0"
+      onPointerDown={stopRowInteraction}
+    >
       <button
+        ref={buttonRef}
         type="button"
-        aria-label="Select project"
+        aria-label={
+          selectedProject
+            ? `Project: ${selectedProject.name}. Change project`
+            : "Select project"
+        }
         aria-haspopup="listbox"
         aria-expanded={open}
         onClick={(event) => {
-          event.stopPropagation();
+          stopRowInteraction(event);
           setOpen((current) => !current);
         }}
-        className="flex h-6 w-6 items-center justify-center rounded-full transition-colors duration-200 hover:bg-[var(--color-ash)]"
+        onPointerDown={stopRowInteraction}
+        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full transition-colors duration-200 hover:bg-[var(--color-ash)]"
       >
         {selectedProject?.color ? (
           <span
-            className="h-3 w-3 rounded-full"
+            className="h-3.5 w-3.5 rounded-full"
             style={{ backgroundColor: selectedProject.color }}
           />
         ) : (
-          <span className="h-3 w-3 rounded-full border border-[var(--color-frost)] bg-[var(--color-obsidian)]" />
+          <span className="h-3.5 w-3.5 rounded-full border border-[var(--color-frost)]" />
         )}
       </button>
-
-      {open && (
-        <ul
-          role="listbox"
-          aria-label="Projects"
-          className="absolute right-0 top-[calc(100%+4px)] z-20 max-h-40 min-w-[160px] overflow-y-auto rounded-[8px] border border-[var(--color-border-subtle)] bg-[var(--color-obsidian)] py-1 shadow-[0_4px_24px_var(--color-shadow-soft)]"
-        >
-          <li role="option" aria-selected={projectId === null}>
-            <button
-              type="button"
-              onClick={(event) => {
-                event.stopPropagation();
-                onChange(null);
-                setOpen(false);
-              }}
-              className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-[13px] text-[var(--color-bone)] transition-colors duration-200 hover:bg-[var(--color-ash)]"
-            >
-              No project
-              <span className="h-3 w-3 rounded-full border border-[var(--color-frost)]" />
-            </button>
-          </li>
-          {projects.map((project) => (
-            <li key={project.id} role="option" aria-selected={project.id === projectId}>
-              <button
-                type="button"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  onChange(project.id);
-                  setOpen(false);
-                }}
-                className={cn(
-                  "flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-[13px] text-[var(--color-bone)] transition-colors duration-200 hover:bg-[var(--color-ash)]",
-                  project.id === projectId && "bg-[var(--color-ash)]"
-                )}
-              >
-                <span className="truncate">{project.name}</span>
-                {project.color ? (
-                  <span
-                    className="h-3 w-3 shrink-0 rounded-full"
-                    style={{ backgroundColor: project.color }}
-                  />
-                ) : (
-                  <span className="h-3 w-3 shrink-0 rounded-full border border-[var(--color-frost)]" />
-                )}
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
+      {menu}
     </div>
   );
 }
@@ -366,20 +456,13 @@ export function TodoRow({
           onPointerMove={handleRowPointerMove}
           onPointerUp={handleRowPointerUp}
           onPointerCancel={handleRowPointerUp}
-          onClick={() => {
-            if (didSwipe.current) {
-              didSwipe.current = false;
-              return;
-            }
-            void handleToggleComplete();
-          }}
           className="flex touch-pan-y items-center gap-3 py-2.5"
         >
           <button
             type="button"
+            data-todo-complete
             aria-label={todo.completed ? "Mark incomplete" : "Mark complete"}
-            onClick={(event) => {
-              event.stopPropagation();
+            onClick={() => {
               void handleToggleComplete();
             }}
             className="flex h-5 w-5 shrink-0 items-center justify-center"

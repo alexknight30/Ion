@@ -7,8 +7,10 @@ import { cn } from "@/lib/cn";
 
 const ease = [0.16, 1, 0.3, 1] as const;
 const CLICK_DELAY_MS = 250;
-// left-6 (24px) + half of w-14 (28px) hides the left semicircle off-screen
-const DOCKED_OFFSET_PX = 52;
+const BUTTON_SIZE_PX = 56; // w-14
+const LEFT_OFFSET_PX = 24; // left-6
+// Slide left until only the right third of the button remains visible
+const DOCKED_OFFSET_PX = LEFT_OFFSET_PX + (BUTTON_SIZE_PX * 2) / 3;
 
 export function AgentButton() {
   const [open, setOpen] = useState(false);
