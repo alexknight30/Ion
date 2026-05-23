@@ -209,7 +209,7 @@ function ThoughtJournalView({
       const element = scrollContainerRef.current?.querySelector(
         `[data-thought-id="${focusedNoteId}"]`
       );
-      element?.scrollIntoView({ block: "center", behavior: "smooth" });
+      element?.scrollIntoView({ block: "start", behavior: "smooth" });
     }, 50);
 
     return () => window.clearTimeout(timeout);
