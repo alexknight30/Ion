@@ -33,14 +33,14 @@ export function AgentButton() {
         onClick={() => setOpen((prev) => !prev)}
         aria-label={open ? "Close agent" : "Open agent"}
         aria-expanded={open}
-        className="relative z-10 flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-full border border-[var(--color-border-active)] bg-[var(--color-obsidian)] shadow-[0_2px_12px_var(--color-shadow-soft),0_0_0_1px_var(--color-border-subtle)] transition-shadow duration-200 hover:shadow-[0_4px_24px_var(--color-shadow-hover),0_0_0_1px_var(--color-border-active)]"
+        className="relative z-10 flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full border border-[var(--color-border-active)] bg-[var(--color-obsidian)] shadow-[0_2px_12px_var(--color-shadow-soft),0_0_0_1px_var(--color-border-subtle)] transition-shadow duration-200 hover:shadow-[0_4px_24px_var(--color-shadow-hover),0_0_0_1px_var(--color-border-active)]"
       >
         <Image
           src="/ion.svg"
           alt=""
-          width={56}
-          height={56}
-          className="h-14 w-14 scale-[1.35]"
+          width={48}
+          height={48}
+          className="h-12 w-12 scale-[1.35]"
           priority
         />
       </motion.button>
@@ -54,7 +54,7 @@ export function AgentButton() {
             transition={{ duration: 0.4, ease }}
             className="overflow-hidden"
           >
-            <div className="flex h-16 w-[360px] items-center rounded-[12px] border border-[var(--color-border-active)] bg-[var(--color-obsidian)] shadow-[0_2px_12px_var(--color-shadow-soft),0_0_0_1px_var(--color-border-subtle)]">
+            <div className="flex h-14 w-[360px] items-center rounded-[12px] border border-[var(--color-border-active)] bg-[var(--color-obsidian)] shadow-[0_2px_12px_var(--color-shadow-soft),0_0_0_1px_var(--color-border-subtle)]">
               <input
                 ref={inputRef}
                 type="text"

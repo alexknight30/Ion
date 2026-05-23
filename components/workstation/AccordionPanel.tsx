@@ -12,6 +12,8 @@ interface AccordionPanelProps {
   headerAction?: React.ReactNode;
   children?: React.ReactNode;
   scrollContent?: boolean;
+  expandSize?: "fill" | "limited";
+  className?: string;
 }
 
 export function AccordionPanel({
@@ -22,14 +24,21 @@ export function AccordionPanel({
   headerAction,
   children,
   scrollContent = true,
+  expandSize = "fill",
+  className,
 }: AccordionPanelProps) {
   return (
     <Surface
       index={index}
       className={cn(
         "flex flex-col overflow-hidden !p-0 transition-shadow duration-200",
-        isOpen ? "min-h-0 flex-1" : "shrink-0",
-        !isOpen && "hover:shadow-[0_4px_24px_var(--color-shadow-hover)]"
+        isOpen
+          ? expandSize === "fill"
+            ? "min-h-0 flex-1"
+            : "mb-20 min-h-0 flex-1"
+          : "shrink-0",
+        !isOpen && "hover:shadow-[0_4px_24px_var(--color-shadow-hover)]",
+        className
       )}
     >
       <div className="relative shrink-0">

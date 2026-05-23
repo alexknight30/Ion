@@ -59,6 +59,8 @@ interface SimpleAccordionPanelProps {
   index?: number;
   isOpen: boolean;
   onToggle: () => void;
+  expandSize?: "fill" | "limited";
+  className?: string;
 }
 
 function SimpleAccordionPanel({
@@ -66,6 +68,8 @@ function SimpleAccordionPanel({
   index = 0,
   isOpen,
   onToggle,
+  expandSize = "fill",
+  className,
 }: SimpleAccordionPanelProps) {
   const headerAction = (
     <button
@@ -84,6 +88,8 @@ function SimpleAccordionPanel({
       isOpen={isOpen}
       onToggle={onToggle}
       headerAction={isOpen ? headerAction : undefined}
+      expandSize={expandSize}
+      className={className}
     />
   );
 }
@@ -112,6 +118,7 @@ function WorkstationView() {
             index={index + 1}
             isOpen={openSection === label}
             onToggle={() => handleToggle(label)}
+            expandSize={label === "Thoughts" ? "limited" : "fill"}
           />
         ))}
       </div>
