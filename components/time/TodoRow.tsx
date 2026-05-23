@@ -127,7 +127,7 @@ function TodoProjectPicker({
             </li>
             {projects.length === 0 ? (
               <li className="px-3 py-2 text-[12px] text-[var(--color-pumice)]">
-                Create a project in Workstation first.
+                Create a project in Work first.
               </li>
             ) : (
               projects.map((project) => (

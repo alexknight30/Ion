@@ -19,7 +19,7 @@ import { TodoListPanel } from "@/components/time/TodoListPanel";
 import { ChatView } from "@/components/chat/ChatView";
 import { getTodayDate } from "@/lib/calendar";
 
-type WorkstationSection = "Projects" | "Thoughts" | "Artifacts";
+type WorkSection = "Projects" | "Thoughts" | "Artifacts";
 
 function EmptyState() {
   return (
@@ -46,7 +46,7 @@ function Panel({ label, index = 0, className }: PanelProps) {
   );
 }
 
-function TimeView() {
+function OrganizeView() {
   const [selectedDate, setSelectedDate] = useState(getTodayDate);
 
   return (
@@ -69,15 +69,15 @@ function TimeView() {
   );
 }
 
-function WorkstationView() {
-  const [openSection, setOpenSection] = useState<WorkstationSection | null>(
+function WorkView() {
+  const [openSection, setOpenSection] = useState<WorkSection | null>(
     null
   );
   const [activeArtifactId, setActiveArtifactId] = useState<string | null>(null);
   const [whiteboardRefreshKey, setWhiteboardRefreshKey] = useState(0);
   const [projectsRefreshKey, setProjectsRefreshKey] = useState(0);
 
-  const handleToggle = (section: WorkstationSection) => {
+  const handleToggle = (section: WorkSection) => {
     setOpenSection((current) => (current === section ? null : section));
   };
 
@@ -139,22 +139,22 @@ function SettingsView() {
 }
 
 const views: Record<Tab, ReactNode> = {
-  Time: <TimeView />,
-  Workstation: <WorkstationView />,
+  Organize: <OrganizeView />,
+  Work: <WorkView />,
   Chat: <ChatView />,
   Settings: <SettingsView />,
 };
 
 const tabLayout: Record<Tab, string> = {
-  Time: "h-full min-h-0 pl-6 pr-8 md:pl-8",
-  Workstation: "h-full min-h-0 pl-6 pr-8 md:pl-8",
+  Organize: "h-full min-h-0 pl-6 pr-8 md:pl-8",
+  Work: "h-full min-h-0 pl-6 pr-8 md:pl-8",
   Chat: "h-full min-h-0 pl-6 pr-8 md:pl-8",
   Settings:
     "mx-auto h-full min-h-0 w-full max-w-6xl overflow-y-auto px-8",
 };
 
 export default function Home() {
-  const [activeTab, setActiveTab] = useState<Tab>("Time");
+  const [activeTab, setActiveTab] = useState<Tab>("Organize");
 
   return (
     <div className="flex h-dvh flex-col overflow-hidden">

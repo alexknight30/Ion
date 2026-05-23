@@ -5,6 +5,16 @@ export const MISC_THOUGHTS_DISPLAY_TITLE = "misc notes";
 export const THOUGHTS_JOURNAL_KIND = "thoughts-journal";
 export const USER_ARTIFACT_KIND = "txt";
 
+// `kind` identifies artifact behavior in the backend (system journals vs user files).
+// `getArtifactTypeLabel` maps that to the user-facing type shown in the UI.
+export function getArtifactTypeLabel(kind: string): string {
+  if (kind === THOUGHTS_JOURNAL_KIND) {
+    return USER_ARTIFACT_KIND;
+  }
+
+  return kind;
+}
+
 export function getProjectThoughtsTitle(projectName: string) {
   return `${projectName}-thoughts`;
 }

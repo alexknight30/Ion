@@ -3,7 +3,7 @@
 import type { Artifact } from "@/lib/artifacts";
 import {
   getArtifactDisplayTitle,
-  THOUGHTS_JOURNAL_KIND,
+  getArtifactTypeLabel,
 } from "@/lib/artifact-constants";
 
 interface ArtifactRowProps {
@@ -13,10 +13,7 @@ interface ArtifactRowProps {
 
 export function ArtifactRow({ artifact, onOpen }: ArtifactRowProps) {
   const title = getArtifactDisplayTitle(artifact);
-  const subtitle =
-    artifact.kind === THOUGHTS_JOURNAL_KIND
-      ? "Thought journal"
-      : artifact.kind;
+  const subtitle = getArtifactTypeLabel(artifact.kind);
 
   return (
     <button

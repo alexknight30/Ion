@@ -6,12 +6,14 @@ import { Surface } from "@/components/ui/Surface";
 import { Label } from "@/components/ui/Label";
 import {
   getArtifactDisplayTitle,
+  getArtifactTypeLabel,
   THOUGHTS_JOURNAL_KIND,
 } from "@/lib/artifact-constants";
 import {
   fetchArtifact,
   updateArtifact,
   type Artifact,
+  type ArtifactProject,
   type ThoughtNote,
 } from "@/lib/artifacts";
 import { formatThoughtTimestamp, wasThoughtEdited } from "@/lib/format";
@@ -31,6 +33,33 @@ function EmptyState() {
         Nothing here yet
       </span>
     </div>
+  );
+}
+
+function ArtifactTypeBadge({ kind }: { kind: string }) {
+  return (
+    <span className="shrink-0 rounded-[9999px] border border-[var(--color-border-subtle)] bg-[var(--color-ash)] px-2.5 py-1 text-[12px] font-medium tracking-[-0.01em] text-[var(--color-steam)]">
+      {kind}
+    </span>
+  );
+}
+
+function ArtifactProjectBadge({
+  project,
+}: {
+  project: ArtifactProject | null | undefined;
+}) {
+  return (
+    <span className="flex min-w-0 items-center gap-1.5 text-[12px] font-medium tracking-[-0.01em] text-[var(--color-pumice)]">
+      <span className="truncate">{project?.name ?? "Unassigned"}</span>
+      {project?.color ? (
+        <span
+          className="h-3 w-3 shrink-0 rounded-full"
+          style={{ backgroundColor: project.color }}
+          aria-hidden
+        />
+      ) : null}
+    </span>
   );
 }
 
@@ -251,8 +280,14 @@ export function Whiteboard({
 
   return (
     <Surface index={index} className="flex min-h-0 h-full flex-col !p-0">
-      <div className="relative flex shrink-0 items-center px-4 py-4">
-        <Label>{displayTitle ?? "Whiteboard"}</Label>
+      <div className="relative flex shrink-0 items-center gap-2.5 px-4 py-4 pr-12">
+        <Label className="shrink-0">{displayTitle ?? "Whiteboard"}</Label>
+        {artifact ? (
+          <>
+            <ArtifactTypeBadge kind={getArtifactTypeLabel(artifact.kind)} />
+            <ArtifactProjectBadge project={artifact.project} />
+          </>
+        ) : null}
         {artifactId && (
           <button
             type="button"

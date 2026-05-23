@@ -7,7 +7,7 @@ import type { Artifact, ThoughtNote } from "@/lib/artifacts";
 import { fetchArtifact } from "@/lib/artifacts";
 import {
   getArtifactDisplayTitle,
-  THOUGHTS_JOURNAL_KIND,
+  getArtifactTypeLabel,
 } from "@/lib/artifact-constants";
 import { formatThoughtTimestamp } from "@/lib/format";
 import type { Project } from "@/lib/projects";
@@ -420,9 +420,7 @@ export function ProjectRow({
                         {getArtifactDisplayTitle(artifact)}
                       </span>
                       <span className="block truncate text-[11px] tracking-[-0.01em] text-[var(--color-pumice)]">
-                        {artifact.kind === THOUGHTS_JOURNAL_KIND
-                          ? "Thought journal"
-                          : artifact.kind}
+                        {getArtifactTypeLabel(artifact.kind)}
                       </span>
                     </button>
                   ))

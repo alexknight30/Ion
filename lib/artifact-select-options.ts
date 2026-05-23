@@ -2,9 +2,11 @@ import type { Artifact } from "@/lib/artifacts";
 import type { Project } from "@/lib/projects";
 import {
   getArtifactDisplayTitle,
+  getArtifactTypeLabel,
   getProjectThoughtsDisplayTitle,
   isMiscThoughtsArtifact,
   isProjectThoughtsJournal,
+  THOUGHTS_JOURNAL_KIND,
   USER_ARTIFACT_KIND,
 } from "@/lib/artifact-constants";
 
@@ -42,7 +44,7 @@ export function buildThoughtDestinationOptions(
     options.push({
       id: MISC_THOUGHTS_OPTION_ID,
       label: getArtifactDisplayTitle(misc),
-      subtitle: "Unassigned · Thought journal",
+      subtitle: `Unassigned · ${getArtifactTypeLabel(THOUGHTS_JOURNAL_KIND)}`,
       color: null,
       projectId: null,
     });
@@ -57,7 +59,7 @@ export function buildThoughtDestinationOptions(
     options.push({
       id: journal.projectId,
       label: getArtifactDisplayTitle(journal),
-      subtitle: `${journal.project?.name ?? "Project"} · Thought journal`,
+      subtitle: `${journal.project?.name ?? "Project"} · ${getArtifactTypeLabel(journal.kind)}`,
       color: journal.project?.color ?? null,
       projectId: journal.projectId,
     });
@@ -69,7 +71,7 @@ export function buildThoughtDestinationOptions(
     options.push({
       id: project.id,
       label: getProjectThoughtsDisplayTitle(project.name),
-      subtitle: `${project.name} · Thought journal`,
+      subtitle: `${project.name} · ${getArtifactTypeLabel(THOUGHTS_JOURNAL_KIND)}`,
       color: project.color,
       projectId: project.id,
     });
@@ -103,9 +105,7 @@ export function buildArtifactParentOptions(
     options.push({
       id: artifact.id,
       label: getArtifactDisplayTitle(artifact),
-      subtitle: isProjectThoughtsJournal(artifact)
-        ? `${artifact.project?.name ?? "Project"} · Thought journal`
-        : `${artifact.project?.name ?? "Project"} · ${artifact.kind}`,
+      subtitle: `${artifact.project?.name ?? "Project"} · ${getArtifactTypeLabel(artifact.kind)}`,
       color: artifact.project?.color ?? null,
       projectId: artifact.projectId,
     });
