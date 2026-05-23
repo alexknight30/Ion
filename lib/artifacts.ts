@@ -32,7 +32,7 @@ export interface CreateArtifactInput {
   content?: string;
 }
 
-export const ARTIFACT_TYPES = ["txt"] as const;
+export const ARTIFACT_TYPES = ["txt", "sketch"] as const;
 export type ArtifactType = (typeof ARTIFACT_TYPES)[number];
 
 export async function fetchArtifacts(): Promise<Artifact[]> {

@@ -13,6 +13,7 @@ import {
   buildArtifactParentOptions,
   getProjectIdForOption,
 } from "@/lib/artifact-select-options";
+import { serializeSketch, createEmptySketchDocument } from "@/lib/sketch";
 import type { Project } from "@/lib/projects";
 
 interface ArtifactFormProps {
@@ -83,7 +84,10 @@ export function ArtifactForm({
         title: trimmedTitle,
         kind: type,
         projectId,
-        content: "",
+        content:
+          type === "sketch"
+            ? serializeSketch(createEmptySketchDocument())
+            : "",
       });
       onCancel();
     } catch {

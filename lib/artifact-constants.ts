@@ -4,6 +4,18 @@ export const MISC_THOUGHTS_TITLE = "misc-thoughts";
 export const MISC_THOUGHTS_DISPLAY_TITLE = "misc notes";
 export const THOUGHTS_JOURNAL_KIND = "thoughts-journal";
 export const USER_ARTIFACT_KIND = "txt";
+export const SKETCH_ARTIFACT_KIND = "sketch";
+
+export function isUserCreatableArtifact(artifact: {
+  isSystem: boolean;
+  kind: string;
+}) {
+  return (
+    !artifact.isSystem &&
+    (artifact.kind === USER_ARTIFACT_KIND ||
+      artifact.kind === SKETCH_ARTIFACT_KIND)
+  );
+}
 
 // `kind` identifies artifact behavior in the backend (system journals vs user files).
 // `getArtifactTypeLabel` maps that to the user-facing type shown in the UI.

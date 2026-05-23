@@ -4,9 +4,11 @@ import { useEffect, useRef, useState } from "react";
 import { X } from "lucide-react";
 import { Surface } from "@/components/ui/Surface";
 import { Label } from "@/components/ui/Label";
+import { SketchEditor } from "@/components/workstation/SketchEditor";
 import {
   getArtifactDisplayTitle,
   getArtifactTypeLabel,
+  SKETCH_ARTIFACT_KIND,
   THOUGHTS_JOURNAL_KIND,
 } from "@/lib/artifact-constants";
 import {
@@ -16,7 +18,12 @@ import {
   type ArtifactProject,
   type ThoughtNote,
 } from "@/lib/artifacts";
-import { formatThoughtTimestamp, wasThoughtEdited } from "@/lib/format";
+import {
+  formatThoughtDayHeader,
+  formatThoughtTimestamp,
+  getThoughtDayKey,
+  wasThoughtEdited,
+} from "@/lib/format";
 import { updateThought } from "@/lib/thoughts";
 
 interface WhiteboardProps {
@@ -158,6 +165,31 @@ function ThoughtEntry({
   );
 }
 
+function groupNotesByDay(notes: ThoughtNote[]) {
+  const groups: Array<{
+    dayKey: string;
+    label: string;
+    notes: ThoughtNote[];
+  }> = [];
+
+  for (const note of notes) {
+    const dayKey = getThoughtDayKey(note.createdAt);
+    const lastGroup = groups[groups.length - 1];
+
+    if (lastGroup?.dayKey === dayKey) {
+      lastGroup.notes.push(note);
+    } else {
+      groups.push({
+        dayKey,
+        label: formatThoughtDayHeader(note.createdAt),
+        notes: [note],
+      });
+    }
+  }
+
+  return groups;
+}
+
 function ThoughtJournalView({
   notes,
   onNoteUpdate,
@@ -175,10 +207,27 @@ function ThoughtJournalView({
     );
   }
 
+  const dayGroups = groupNotesByDay(notes);
+
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto pr-1">
-      {notes.map((note) => (
-        <ThoughtEntry key={note.id} note={note} onUpdate={onNoteUpdate} />
+    <div className="flex min-h-0 flex-1 flex-col gap-8 overflow-y-auto pr-1">
+      {dayGroups.map((group, groupIndex) => (
+        <section key={group.dayKey}>
+          {groupIndex > 0 ? (
+            <div
+              role="separator"
+              className="mb-6 border-t border-[var(--color-border-subtle)]"
+            />
+          ) : null}
+          <h2 className="mb-4 text-[12px] font-medium tracking-[-0.01em] text-[var(--color-pumice)]">
+            {group.label}
+          </h2>
+          <div className="flex flex-col gap-6">
+            {group.notes.map((note) => (
+              <ThoughtEntry key={note.id} note={note} onUpdate={onNoteUpdate} />
+            ))}
+          </div>
+        </section>
       ))}
     </div>
   );
@@ -242,7 +291,13 @@ export function Whiteboard({
   }, [artifactId, refreshKey]);
 
   async function handleContentChange(content: string) {
-    if (!artifact || artifact.kind === THOUGHTS_JOURNAL_KIND) return;
+    if (
+      !artifact ||
+      artifact.kind === THOUGHTS_JOURNAL_KIND ||
+      artifact.kind === SKETCH_ARTIFACT_KIND
+    ) {
+      return;
+    }
 
     setArtifact((current) =>
       current ? { ...current, content } : current
@@ -275,7 +330,23 @@ export function Whiteboard({
     }
   }
 
+  async function handleSketchChange(content: string) {
+    if (!artifact || artifact.kind !== SKETCH_ARTIFACT_KIND) return;
+
+    setArtifact((current) =>
+      current ? { ...current, content } : current
+    );
+
+    try {
+      const updated = await updateArtifact(artifact.id, { content });
+      setArtifact(updated);
+    } catch {
+      setError("Could not save changes.");
+    }
+  }
+
   const isJournal = artifact?.kind === THOUGHTS_JOURNAL_KIND;
+  const isSketch = artifact?.kind === SKETCH_ARTIFACT_KIND;
   const displayTitle = artifact ? getArtifactDisplayTitle(artifact) : null;
 
   return (
@@ -318,6 +389,11 @@ export function Whiteboard({
               <ThoughtJournalView
                 notes={artifact.notes ?? []}
                 onNoteUpdate={handleNoteUpdate}
+              />
+            ) : isSketch ? (
+              <SketchEditor
+                content={artifact.content ?? ""}
+                onChange={handleSketchChange}
               />
             ) : (
               <TextArtifactView

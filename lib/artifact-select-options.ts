@@ -6,8 +6,8 @@ import {
   getProjectThoughtsDisplayTitle,
   isMiscThoughtsArtifact,
   isProjectThoughtsJournal,
+  isUserCreatableArtifact,
   THOUGHTS_JOURNAL_KIND,
-  USER_ARTIFACT_KIND,
 } from "@/lib/artifact-constants";
 
 export const MISC_THOUGHTS_OPTION_ID = "__misc__";
@@ -94,8 +94,7 @@ export function buildArtifactParentOptions(
   const assignableArtifacts = artifacts.filter(
     (artifact) =>
       artifact.projectId &&
-      (isProjectThoughtsJournal(artifact) ||
-        (!artifact.isSystem && artifact.kind === USER_ARTIFACT_KIND))
+      (isProjectThoughtsJournal(artifact) || isUserCreatableArtifact(artifact))
   );
 
   for (const artifact of assignableArtifacts) {
@@ -139,9 +138,7 @@ export function getProjectUserArtifacts(
 ) {
   return artifacts.filter(
     (artifact) =>
-      artifact.projectId === projectId &&
-      !artifact.isSystem &&
-      artifact.kind === USER_ARTIFACT_KIND
+      artifact.projectId === projectId && isUserCreatableArtifact(artifact)
   );
 }
 

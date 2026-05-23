@@ -8,11 +8,18 @@ import {
   requireString,
   serverError,
 } from "@/lib/api";
+import { serializeSketch, createEmptySketchDocument } from "@/lib/sketch";
 import {
   getOrCreateMiscThoughtsArtifact,
   isReservedArtifactTitle,
+  SKETCH_ARTIFACT_KIND,
   USER_ARTIFACT_KIND,
 } from "@/lib/artifact-constants";
+
+const CREATABLE_ARTIFACT_KINDS = new Set([
+  USER_ARTIFACT_KIND,
+  SKETCH_ARTIFACT_KIND,
+]);
 
 export async function GET() {
   try {
@@ -54,8 +61,8 @@ export async function POST(request: Request) {
   if (projectId instanceof Response) return projectId;
 
   const kind = optionalString(body.kind) ?? USER_ARTIFACT_KIND;
-  if (kind !== USER_ARTIFACT_KIND) {
-    return badRequest(`Only "${USER_ARTIFACT_KIND}" artifacts can be created currently`);
+  if (!CREATABLE_ARTIFACT_KINDS.has(kind)) {
+    return badRequest(`Unsupported artifact kind "${kind}"`);
   }
 
   if (isReservedArtifactTitle(title)) {
@@ -75,7 +82,12 @@ export async function POST(request: Request) {
         title,
         kind,
         projectId,
-        content: typeof body.content === "string" ? body.content : "",
+        content:
+          typeof body.content === "string"
+            ? body.content
+            : kind === SKETCH_ARTIFACT_KIND
+              ? serializeSketch(createEmptySketchDocument())
+              : "",
         isSystem: false,
       },
       include: {
