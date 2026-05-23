@@ -14,6 +14,7 @@ import { AgentPanel } from "@/components/settings/AgentPanel";
 import { IntegrationsPanel } from "@/components/settings/IntegrationsPanel";
 import { PreferencesPanel } from "@/components/settings/PreferencesPanel";
 import { CalendarPanel } from "@/components/time/CalendarPanel";
+import { InboxPanel } from "@/components/time/InboxPanel";
 import { TodoListPanel } from "@/components/time/TodoListPanel";
 import { ChatView } from "@/components/chat/ChatView";
 import { getTodayDate } from "@/lib/calendar";
@@ -57,7 +58,7 @@ function TimeView() {
           index={0}
           className="shrink-0"
         />
-        <Panel label="Inbox" index={2} className="min-h-0 flex-1" />
+        <InboxPanel index={2} className="min-h-0 flex-1" />
       </div>
       <TodoListPanel
         selectedDate={selectedDate}
