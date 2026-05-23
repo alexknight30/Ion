@@ -78,6 +78,26 @@ function clientToWorld(
   };
 }
 
+function shouldIgnorePanStart(target: EventTarget | null) {
+  if (!(target instanceof Element)) return false;
+
+  return Boolean(
+    target.closest(
+      "textarea, input, button, [data-resize-handle], [data-sketch-anchor], [data-sketch-toolbar]"
+    )
+  );
+}
+
+function isPanShortcut(event: KeyboardEvent) {
+  return (
+    event.altKey &&
+    !event.metaKey &&
+    !event.ctrlKey &&
+    !event.shiftKey &&
+    event.code === "KeyZ"
+  );
+}
+
 function toolButtonClass() {
   return cn(
     "flex items-center gap-1.5 rounded-[8px] border border-[var(--color-border-subtle)] px-2.5 py-1.5 text-[12px] font-medium tracking-[-0.01em] text-[var(--color-steam)] transition-[border-color,background-color,color] duration-200 hover:border-[var(--color-border-active)] hover:text-[var(--color-bone)]"
@@ -117,7 +137,6 @@ export function SketchEditor({ content, onChange }: SketchEditorProps) {
   const [doc, setDoc] = useState<SketchDocument>(() => parseSketch(content));
   const [connectMode, setConnectMode] = useState<SketchEdgeKind | null>(null);
   const [panMode, setPanMode] = useState(false);
-  const [panShortcutHeld, setPanShortcutHeld] = useState(false);
   const [pendingConnection, setPendingConnection] =
     useState<PendingConnection | null>(null);
   const [cursorWorld, setCursorWorld] = useState<{ x: number; y: number } | null>(
@@ -137,7 +156,7 @@ export function SketchEditor({ content, onChange }: SketchEditorProps) {
   const clipboardRef = useRef<SketchClipboard | null>(null);
   const cursorWorldRef = useRef<{ x: number; y: number } | null>(null);
 
-  const isPanning = panMode || panShortcutHeld;
+  const isPanning = panMode;
   const showAnchors = connectMode !== null || pendingConnection !== null;
 
   const persist = useCallback(
@@ -271,12 +290,15 @@ export function SketchEditor({ content, onChange }: SketchEditorProps) {
       if (dragState?.kind === "node" || dragState?.kind === "resize") {
         pushHistory(docRef.current);
       }
+      if (dragState?.kind === "pan") {
+        persist(docRef.current);
+      }
       setDragState(null);
     }
 
     window.addEventListener("pointerup", handlePointerUp);
     return () => window.removeEventListener("pointerup", handlePointerUp);
-  }, [dragState, pushHistory]);
+  }, [dragState, pushHistory, persist]);
 
   useEffect(() => {
     return () => {
@@ -287,16 +309,20 @@ export function SketchEditor({ content, onChange }: SketchEditorProps) {
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
+      if (isPanShortcut(event)) {
+        event.preventDefault();
+        if (!event.repeat) {
+          setPanMode((current) => !current);
+        }
+        return;
+      }
+
       const target = event.target;
       if (
         target instanceof HTMLElement &&
         (target.tagName === "TEXTAREA" || target.tagName === "INPUT")
       ) {
         return;
-      }
-
-      if (event.altKey && event.key.toLowerCase() === "z") {
-        setPanShortcutHeld(true);
       }
 
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "v") {
@@ -316,17 +342,9 @@ export function SketchEditor({ content, onChange }: SketchEditorProps) {
       }
     }
 
-    function handleKeyUp(event: KeyboardEvent) {
-      if (event.key.toLowerCase() === "z" || !event.altKey) {
-        setPanShortcutHeld(false);
-      }
-    }
-
     window.addEventListener("keydown", handleKeyDown);
-    window.addEventListener("keyup", handleKeyUp);
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
-      window.removeEventListener("keyup", handleKeyUp);
     };
   }, [undo, pasteClipboard]);
 
@@ -383,22 +401,30 @@ export function SketchEditor({ content, onChange }: SketchEditorProps) {
     setCursorWorld(world);
   }
 
-  function handleCanvasPointerDown(event: React.PointerEvent<HTMLDivElement>) {
-    if (event.target !== event.currentTarget) return;
+  function handlePanPointerDownCapture(
+    event: React.PointerEvent<HTMLDivElement>
+  ) {
+    if (!isPanning || shouldIgnorePanStart(event.target)) return;
 
     setContextMenu(null);
     trackPointerWorld(event.clientX, event.clientY);
+    event.preventDefault();
+    event.stopPropagation();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    setDragState({
+      kind: "pan",
+      startClientX: event.clientX,
+      startClientY: event.clientY,
+      originX: docRef.current.viewport.x,
+      originY: docRef.current.viewport.y,
+    });
+  }
 
-    if (isPanning) {
-      event.currentTarget.setPointerCapture(event.pointerId);
-      setDragState({
-        kind: "pan",
-        startClientX: event.clientX,
-        startClientY: event.clientY,
-        originX: doc.viewport.x,
-        originY: doc.viewport.y,
-      });
-    }
+  function handleCanvasPointerDown(event: React.PointerEvent<HTMLDivElement>) {
+    setContextMenu(null);
+    trackPointerWorld(event.clientX, event.clientY);
+
+    if (event.target !== event.currentTarget) return;
   }
 
   function handleCanvasPointerMove(event: React.PointerEvent<HTMLDivElement>) {
@@ -409,7 +435,7 @@ export function SketchEditor({ content, onChange }: SketchEditorProps) {
     if (dragState.kind === "pan") {
       const dx = event.clientX - dragState.startClientX;
       const dy = event.clientY - dragState.startClientY;
-      updateDoc((current) => ({
+      setDoc((current) => ({
         ...current,
         viewport: {
           ...current.viewport,
@@ -472,10 +498,17 @@ export function SketchEditor({ content, onChange }: SketchEditorProps) {
   }
 
   function endDrag(event: React.PointerEvent<HTMLDivElement>) {
+    const wasPanning = dragState?.kind === "pan";
+
     if (dragState && event.currentTarget.hasPointerCapture(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId);
     }
+
     setDragState(null);
+
+    if (wasPanning) {
+      persist(docRef.current);
+    }
   }
 
   function handlePerimeterDragStart(
@@ -632,7 +665,10 @@ export function SketchEditor({ content, onChange }: SketchEditorProps) {
       className="relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-[8px] border border-[var(--color-border-subtle)] bg-[var(--color-obsidian)]"
       onPointerMove={(event) => trackPointerWorld(event.clientX, event.clientY)}
     >
-      <div className="absolute right-3 top-3 z-20 flex items-center gap-1.5">
+      <div
+        data-sketch-toolbar
+        className="absolute right-3 top-3 z-20 flex items-center gap-1.5"
+      >
         <button
           type="button"
           onClick={() => addShapeAtCenter("box")}
@@ -679,6 +715,7 @@ export function SketchEditor({ content, onChange }: SketchEditorProps) {
 
       <div
         ref={canvasRef}
+        onPointerDownCapture={handlePanPointerDownCapture}
         onPointerDown={handleCanvasPointerDown}
         onPointerMove={handleCanvasPointerMove}
         onPointerUp={endDrag}
@@ -843,6 +880,7 @@ export function SketchEditor({ content, onChange }: SketchEditorProps) {
                       <button
                         key={anchor}
                         type="button"
+                        data-sketch-anchor
                         aria-label={`Connect ${anchor}`}
                         onPointerDown={(event) => event.stopPropagation()}
                         onClick={() =>
@@ -914,10 +952,10 @@ export function SketchEditor({ content, onChange }: SketchEditorProps) {
           type="button"
           onClick={() => setPanMode((current) => !current)}
           aria-label="Pan canvas"
-          aria-pressed={panMode || panShortcutHeld}
+          aria-pressed={panMode}
           className={cn(
             "flex items-center gap-2 rounded-[8px] border px-2.5 py-1.5 text-[12px] font-medium tracking-[-0.01em] transition-[border-color,background-color,color] duration-200",
-            panMode || panShortcutHeld
+            panMode
               ? "border-[var(--color-border-active)] bg-[var(--color-ash)] text-[var(--color-glacier)]"
               : "border-[var(--color-border-subtle)] text-[var(--color-steam)] hover:border-[var(--color-border-active)] hover:text-[var(--color-bone)]"
           )}
