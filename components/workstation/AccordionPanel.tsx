@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { Surface } from "@/components/ui/Surface";
 import { Label } from "@/components/ui/Label";
 import { cn } from "@/lib/cn";
@@ -30,6 +31,23 @@ export function AccordionPanel({
   expandSize = "fill",
   className,
 }: AccordionPanelProps) {
+  const [allowScroll, setAllowScroll] = useState(false);
+
+  useEffect(() => {
+    if (!isOpen) {
+      setAllowScroll(false);
+    }
+  }, [isOpen]);
+
+  function handleContentTransitionEnd(
+    event: React.TransitionEvent<HTMLDivElement>
+  ) {
+    if (event.propertyName !== "grid-template-rows") return;
+    if (isOpen && scrollContent) {
+      setAllowScroll(true);
+    }
+  }
+
   return (
     <Surface
       index={index}
@@ -43,21 +61,13 @@ export function AccordionPanel({
         !isOpen && "hover:shadow-[0_4px_24px_var(--color-shadow-hover)]",
         className
       )}
-      style={{
-        transitionProperty: "max-height, box-shadow",
-        transitionDuration: ACCORDION_DURATION,
-        transitionTimingFunction: ACCORDION_EASE,
-      }}
     >
       <div className="relative shrink-0">
         <button
           type="button"
           onClick={onToggle}
           aria-expanded={isOpen}
-          className={cn(
-            "flex w-full items-center px-4 text-left",
-            isOpen ? "py-4" : "py-3"
-          )}
+          className="flex w-full items-center px-4 py-3 text-left"
         >
           <Label>{label}</Label>
         </button>
@@ -67,10 +77,12 @@ export function AccordionPanel({
           </div>
         )}
       </div>
+
       <div
+        onTransitionEnd={handleContentTransitionEnd}
         className={cn(
           "grid min-h-0 motion-reduce:transition-none",
-          isOpen ? "flex-1 grid-rows-[1fr] px-4 pb-4" : "grid-rows-[0fr]"
+          isOpen ? "min-h-0 flex-1 grid-rows-[1fr] px-4 pb-4" : "grid-rows-[0fr]"
         )}
         style={{
           transitionProperty: "grid-template-rows",
@@ -82,8 +94,9 @@ export function AccordionPanel({
           <div
             className={cn(
               "flex h-full min-h-0 flex-col",
-              scrollContent ? "overflow-y-auto" : "overflow-hidden",
-              !isOpen && "invisible opacity-0"
+              allowScroll && scrollContent
+                ? "overflow-y-auto"
+                : "overflow-hidden"
             )}
           >
             {children}
