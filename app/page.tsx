@@ -184,7 +184,7 @@ const views: Record<Exclude<Tab, "Organize">, ReactNode> = {
 const tabLayout: Record<Tab, string> = {
   Organize: "h-full min-h-0 pl-6 pr-8 md:pl-8",
   Work: "h-full min-h-0 pl-6 pr-8 md:pl-8",
-  Chat: "h-full min-h-0 pl-6 pr-8 md:pl-8",
+  Chat: "h-full min-h-0",
   Settings:
     "mx-auto h-full min-h-0 w-full max-w-6xl overflow-y-auto px-8",
 };
