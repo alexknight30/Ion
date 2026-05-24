@@ -11,6 +11,7 @@ import { ThoughtsPanel } from "@/components/workstation/ThoughtsPanel";
 import { Whiteboard } from "@/components/workstation/Whiteboard";
 import { ProfilePanel } from "@/components/settings/ProfilePanel";
 import { AgentPanel } from "@/components/settings/AgentPanel";
+import { UsagePanel } from "@/components/settings/UsagePanel";
 import { IntegrationsPanel } from "@/components/settings/IntegrationsPanel";
 import { PreferencesPanel } from "@/components/settings/PreferencesPanel";
 import { CalendarPanel } from "@/components/time/CalendarPanel";
@@ -18,6 +19,7 @@ import { InboxPanel } from "@/components/time/InboxPanel";
 import { TodoListPanel } from "@/components/time/TodoListPanel";
 import { ChatView } from "@/components/chat/ChatView";
 import { getTodayDate } from "@/lib/calendar";
+import { cn } from "@/lib/cn";
 
 type WorkSection = "Projects" | "Thoughts" | "Artifacts";
 
@@ -46,13 +48,23 @@ function Panel({ label, index = 0, className }: PanelProps) {
   );
 }
 
-function OrganizeView() {
+function OrganizeView({
+  inboxExpanded,
+  onInboxExpandedChange,
+}: {
+  inboxExpanded: boolean;
+  onInboxExpandedChange: (expanded: boolean) => void;
+}) {
   const [selectedDate, setSelectedDate] = useState(getTodayDate);
-  const [inboxExpanded, setInboxExpanded] = useState(false);
 
   return (
     <div className="grid h-full min-h-0 gap-6 md:grid-cols-[minmax(0,7fr)_minmax(0,3fr)]">
-      <div className="flex min-h-0 flex-col gap-6">
+      <div
+        className={cn(
+          "flex min-h-0 flex-col gap-6",
+          inboxExpanded && "overflow-visible"
+        )}
+      >
         {!inboxExpanded && (
           <CalendarPanel
             selectedDate={selectedDate}
@@ -63,10 +75,21 @@ function OrganizeView() {
         )}
         <InboxPanel
           index={2}
-          className="min-h-0 flex-1"
+          className={inboxExpanded ? undefined : "min-h-0 flex-1"}
           expanded={inboxExpanded}
-          onToggleExpanded={() => setInboxExpanded((current) => !current)}
+          onToggleExpanded={() => onInboxExpandedChange(!inboxExpanded)}
+          selectedDate={selectedDate}
+          onSelectDate={setSelectedDate}
         />
+        {inboxExpanded ? (
+          <div className="relative z-20 mt-auto shrink-0 overflow-visible">
+            <AgentButton
+              variant="embedded"
+              defaultOpen
+              placeholder="Need help drafting?"
+            />
+          </div>
+        ) : null}
       </div>
       <TodoListPanel
         selectedDate={selectedDate}
@@ -151,14 +174,14 @@ function SettingsView() {
     <div className="flex flex-col gap-6">
       <ProfilePanel />
       <AgentPanel />
+      <UsagePanel />
       <IntegrationsPanel />
       <PreferencesPanel />
     </div>
   );
 }
 
-const views: Record<Tab, ReactNode> = {
-  Organize: <OrganizeView />,
+const views: Record<Exclude<Tab, "Organize">, ReactNode> = {
   Work: <WorkView />,
   Chat: <ChatView />,
   Settings: <SettingsView />,
@@ -174,22 +197,31 @@ const tabLayout: Record<Tab, string> = {
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState<Tab>("Organize");
+  const [inboxExpanded, setInboxExpanded] = useState(false);
+  const emailModeOnOrganize = activeTab === "Organize" && inboxExpanded;
 
   return (
     <div className="flex h-dvh flex-col overflow-hidden">
       <Navbar activeTab={activeTab} onTabChange={setActiveTab} />
       <main className="min-h-0 flex-1 overflow-hidden pt-[60px] pb-6">
-        {(Object.keys(views) as Tab[]).map((tab) => (
-          <div
-            key={tab}
-            hidden={activeTab !== tab}
-            className={tabLayout[tab]}
-          >
+        <div
+          hidden={activeTab !== "Organize"}
+          className={tabLayout.Organize}
+        >
+          <OrganizeView
+            inboxExpanded={inboxExpanded}
+            onInboxExpandedChange={setInboxExpanded}
+          />
+        </div>
+        {(Object.keys(views) as Array<Exclude<Tab, "Organize">>).map((tab) => (
+          <div key={tab} hidden={activeTab !== tab} className={tabLayout[tab]}>
             {views[tab]}
           </div>
         ))}
       </main>
-      {activeTab !== "Chat" ? <AgentButton /> : null}
+      {activeTab !== "Chat" && !emailModeOnOrganize ? (
+        <AgentButton placeholder="Ask Ion" />
+      ) : null}
     </div>
   );
 }

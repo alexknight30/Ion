@@ -21,7 +21,7 @@ export function IntegrationsPanel() {
   });
 
   return (
-    <SettingsSection label="Integrations" index={2}>
+    <SettingsSection label="Integrations" index={3}>
       <div className="flex flex-col divide-y divide-[var(--color-border-subtle)]">
         {INTEGRATIONS.map(({ id, name, logo }) => (
           <div

@@ -12,8 +12,20 @@ const LEFT_OFFSET_PX = 24; // left-6
 // Slide left until only the right third of the button remains visible
 const DOCKED_OFFSET_PX = LEFT_OFFSET_PX + (BUTTON_SIZE_PX * 2) / 3;
 
-export function AgentButton() {
-  const [open, setOpen] = useState(false);
+interface AgentButtonProps {
+  variant?: "floating" | "embedded";
+  defaultOpen?: boolean;
+  placeholder?: string;
+  className?: string;
+}
+
+export function AgentButton({
+  variant = "floating",
+  defaultOpen = false,
+  placeholder = "Ask Ion",
+  className,
+}: AgentButtonProps) {
+  const [open, setOpen] = useState(defaultOpen);
   const [docked, setDocked] = useState(false);
   const [query, setQuery] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
@@ -68,15 +80,25 @@ export function AgentButton() {
 
   return (
     <motion.div
-      className="fixed bottom-6 left-6 z-50 flex items-center gap-3"
+      className={cn(
+        "flex w-auto items-center gap-3 overflow-visible",
+        variant === "floating"
+          ? "fixed bottom-6 left-6 z-50"
+          : "relative z-20",
+        className
+      )}
       animate={{ x: docked ? -DOCKED_OFFSET_PX : 0 }}
       transition={{ duration: 0.4, ease }}
     >
       <motion.button
         type="button"
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, delay: 0.3, ease }}
+        initial={variant === "floating" ? { opacity: 0, y: 12 } : undefined}
+        animate={variant === "floating" ? { opacity: 1, y: 0 } : undefined}
+        transition={
+          variant === "floating"
+            ? { duration: 0.5, delay: 0.3, ease }
+            : undefined
+        }
         onClick={handleClick}
         onDoubleClick={handleDoubleClick}
         aria-label={
@@ -113,7 +135,7 @@ export function AgentButton() {
                 onKeyDown={(e) => {
                   if (e.key === "Enter") handleSend();
                 }}
-                placeholder="Ask Ion"
+                placeholder={placeholder}
                 className="min-w-0 flex-1 bg-transparent px-5 text-[15px] text-[var(--color-bone)] outline-none placeholder:text-[var(--color-pumice)]"
               />
               <button

@@ -75,3 +75,23 @@ export function getTodayDate(): CalendarDate {
     day: today.getDate(),
   };
 }
+
+export function shiftDay(date: CalendarDate, delta: number): CalendarDate {
+  const next = new Date(date.year, date.month, date.day + delta);
+  return {
+    year: next.getFullYear(),
+    month: next.getMonth(),
+    day: next.getDate(),
+  };
+}
+
+export function formatInboxDayNav({ year, month, day }: CalendarDate) {
+  return new Date(year, month, day).toLocaleDateString(undefined, {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+  });
+}
+
+// Matches CalendarPanel height for a 6-row month (31-day months).
+export const CALENDAR_PANEL_HEIGHT_CLASS = "h-[26.375rem]";
