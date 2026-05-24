@@ -9,8 +9,9 @@ const ease = [0.16, 1, 0.3, 1] as const;
 const CLICK_DELAY_MS = 250;
 const BUTTON_SIZE_PX = 56; // w-14
 const LEFT_OFFSET_PX = 24; // left-6
-// Slide left until only the right third of the button remains visible
-const DOCKED_OFFSET_PX = LEFT_OFFSET_PX + (BUTTON_SIZE_PX * 2) / 3;
+const DOCKED_VISIBLE_PX = 15;
+const DOCKED_OFFSET_PX =
+  LEFT_OFFSET_PX + BUTTON_SIZE_PX - DOCKED_VISIBLE_PX;
 
 export interface AgentButtonState {
   open: boolean;
