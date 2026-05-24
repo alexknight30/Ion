@@ -714,6 +714,7 @@ export const TextArtifactEditor = forwardRef<
 
       if (current?.kind === "checklist") {
         event.preventDefault();
+        const offset = getCaretOffsetInLine(root);
 
         if (current.content.trim() === "") {
           const { lines: nextLines, focusLineIndex } = exitChecklistLine(
@@ -724,13 +725,30 @@ export const TextArtifactEditor = forwardRef<
           return;
         }
 
+        const before = current.content.slice(0, offset);
+        const after = current.content.slice(offset);
+        const indent = current.indent ?? 0;
         const next = [...lines];
+
+        if (offset === 0) {
+          next.splice(lineIndex, 0, {
+            kind: "checklist",
+            content: "",
+            checked: false,
+            indent,
+          });
+          commit(next, lineIndex);
+          return;
+        }
+
+        next[lineIndex] = { ...current, content: before };
         next.splice(lineIndex + 1, 0, {
           kind: "checklist",
-          content: "",
+          content: after,
           checked: false,
+          indent,
         });
-        commit(next, lineIndex + 1);
+        commit(next, lineIndex + 1, 0);
       }
 
       return;
