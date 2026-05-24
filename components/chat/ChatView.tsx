@@ -3,19 +3,10 @@
 import { useEffect, useRef, useState } from "react";
 import {
   ArrowUp,
-  Briefcase,
-  ChevronDown,
   ChevronRight,
-  Clock,
-  Download,
   FileText,
   Image as ImageIcon,
-  LayoutGrid,
-  PanelLeft,
   Plus,
-  Search,
-  Share2,
-  SquarePen,
   X,
 } from "lucide-react";
 import Image from "next/image";
@@ -43,92 +34,6 @@ function createMessage(role: Message["role"], content: string): Message {
     role,
     content,
   };
-}
-
-function SidebarButton({
-  label,
-  children,
-  active = false,
-}: {
-  label: string;
-  children: React.ReactNode;
-  active?: boolean;
-}) {
-  return (
-    <button
-      type="button"
-      aria-label={label}
-      className={cn(
-        "flex h-9 w-9 items-center justify-center rounded-[8px] text-[var(--color-steam)] transition-colors duration-200 hover:bg-[var(--color-ash)] hover:text-[var(--color-bone)]",
-        active && "bg-[var(--color-ash)] text-[var(--color-bone)]"
-      )}
-    >
-      {children}
-    </button>
-  );
-}
-
-function ChatSidebar({ profileInitial }: { profileInitial: string }) {
-  return (
-    <aside className="flex w-14 shrink-0 flex-col items-center border-r border-[var(--color-border-subtle)] bg-[var(--color-obsidian)] py-3">
-      <div className="flex flex-col items-center gap-1">
-        <SidebarButton label="Toggle sidebar">
-          <PanelLeft size={18} strokeWidth={1.5} />
-        </SidebarButton>
-        <SidebarButton label="New chat" active>
-          <SquarePen size={18} strokeWidth={1.5} />
-        </SidebarButton>
-        <SidebarButton label="Search chats">
-          <Search size={18} strokeWidth={1.5} />
-        </SidebarButton>
-        <SidebarButton label="Chat history">
-          <Clock size={18} strokeWidth={1.5} />
-        </SidebarButton>
-        <SidebarButton label="Projects">
-          <LayoutGrid size={18} strokeWidth={1.5} />
-        </SidebarButton>
-        <SidebarButton label="Workstation">
-          <Briefcase size={18} strokeWidth={1.5} />
-        </SidebarButton>
-      </div>
-
-      <div className="mt-auto flex flex-col items-center gap-1">
-        <SidebarButton label="Export">
-          <Download size={18} strokeWidth={1.5} />
-        </SidebarButton>
-        <div
-          aria-hidden
-          className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--color-ash)] text-[12px] font-medium text-[var(--color-bone)]"
-        >
-          {profileInitial}
-        </div>
-      </div>
-    </aside>
-  );
-}
-
-function ChatHeader({ title }: { title: string }) {
-  return (
-    <header className="flex shrink-0 items-center justify-between border-b border-[var(--color-border-subtle)] px-4 py-3 md:px-6">
-      <button
-        type="button"
-        className="flex min-w-0 items-center gap-1.5 text-[14px] font-medium tracking-[-0.01em] text-[var(--color-bone)] transition-colors duration-200 hover:text-[var(--color-glacier)]"
-      >
-        <span className="truncate">{title}</span>
-        <ChevronDown size={14} strokeWidth={1.5} className="shrink-0 text-[var(--color-pumice)]" />
-      </button>
-
-      <div className="flex items-center gap-1">
-        <button
-          type="button"
-          aria-label="Share chat"
-          className="flex h-8 w-8 items-center justify-center rounded-[8px] text-[var(--color-steam)] transition-colors duration-200 hover:bg-[var(--color-ash)] hover:text-[var(--color-bone)]"
-        >
-          <Share2 size={16} strokeWidth={1.5} />
-        </button>
-      </div>
-    </header>
-  );
 }
 
 function EmptyState({ greeting }: { greeting: string }) {
@@ -643,7 +548,6 @@ export function ChatView() {
   const [input, setInput] = useState("");
   const [isThinking, setIsThinking] = useState(false);
   const [greeting, setGreeting] = useState("Ask Ion");
-  const [profileInitial, setProfileInitial] = useState("A");
   const [projects, setProjects] = useState<Project[]>([]);
   const [artifacts, setArtifacts] = useState<Artifact[]>([]);
   const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
@@ -662,8 +566,6 @@ export function ChatView() {
   );
 
   const canSend = input.trim().length > 0 && !isThinking;
-  const chatTitle =
-    messages.find((message) => message.role === "user")?.content ?? "New chat";
 
   useEffect(() => {
     let cancelled = false;
@@ -673,7 +575,6 @@ export function ChatView() {
         if (cancelled) return;
         const firstName = getFirstName(profile.name);
         setGreeting(getRandomChatGreeting(firstName));
-        setProfileInitial(firstName.slice(0, 1).toUpperCase() || "A");
       })
       .catch(() => {
         if (!cancelled) {
@@ -799,72 +700,66 @@ export function ChatView() {
   }
 
   return (
-    <div className="flex h-full min-h-0 bg-[var(--color-void)]">
-      <ChatSidebar profileInitial={profileInitial} />
-
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-        <ChatHeader title={chatTitle} />
-
-        <div
-          ref={scrollRef}
-          className="min-h-0 flex-1 overflow-y-auto px-4 md:px-6"
-        >
-          <div className="mx-auto flex w-full max-w-3xl flex-col gap-5 py-6">
-            {messages.length === 0 && !isThinking ? (
-              <EmptyState greeting={greeting} />
-            ) : (
-              <>
-                {messages.map((message) =>
-                  message.role === "user" ? (
-                    <UserMessage key={message.id} content={message.content} />
-                  ) : (
-                    <AssistantMessage
-                      key={message.id}
-                      content={message.content}
-                    />
-                  )
-                )}
-                {isThinking ? <ThinkingIndicator /> : null}
-              </>
-            )}
-          </div>
+    <div className="flex h-full min-h-0 flex-col bg-[var(--color-void)]">
+      <div
+        ref={scrollRef}
+        className="min-h-0 flex-1 overflow-y-auto px-4 md:px-6"
+      >
+        <div className="mx-auto flex w-full max-w-3xl flex-col gap-5 py-6">
+          {messages.length === 0 && !isThinking ? (
+            <EmptyState greeting={greeting} />
+          ) : (
+            <>
+              {messages.map((message) =>
+                message.role === "user" ? (
+                  <UserMessage key={message.id} content={message.content} />
+                ) : (
+                  <AssistantMessage
+                    key={message.id}
+                    content={message.content}
+                  />
+                )
+              )}
+              {isThinking ? <ThinkingIndicator /> : null}
+            </>
+          )}
         </div>
-
-        <ChatComposer
-          input={input}
-          canSend={canSend}
-          projects={projects}
-          artifacts={artifacts}
-          files={attachedFiles}
-          images={attachedImages}
-          selectedProjects={selectedProjects}
-          selectedArtifacts={selectedArtifacts}
-          onInputChange={setInput}
-          onSend={handleSend}
-          onKeyDown={handleKeyDown}
-          onAddFiles={handleAddFiles}
-          onAddImages={handleAddImages}
-          onToggleProject={handleToggleProject}
-          onToggleArtifact={handleToggleArtifact}
-          onRemoveFile={(index) =>
-            setAttachedFiles((current) => current.filter((_, i) => i !== index))
-          }
-          onRemoveImage={(index) =>
-            setAttachedImages((current) => current.filter((_, i) => i !== index))
-          }
-          onRemoveProject={(projectId) =>
-            setSelectedProjectIds((current) =>
-              current.filter((id) => id !== projectId)
-            )
-          }
-          onRemoveArtifact={(artifactId) =>
-            setSelectedArtifactIds((current) =>
-              current.filter((id) => id !== artifactId)
-            )
-          }
-          textareaRef={textareaRef}
-        />
       </div>
+
+      <ChatComposer
+        input={input}
+        canSend={canSend}
+        projects={projects}
+        artifacts={artifacts}
+        files={attachedFiles}
+        images={attachedImages}
+        selectedProjects={selectedProjects}
+        selectedArtifacts={selectedArtifacts}
+        onInputChange={setInput}
+        onSend={handleSend}
+        onKeyDown={handleKeyDown}
+        onAddFiles={handleAddFiles}
+        onAddImages={handleAddImages}
+        onToggleProject={handleToggleProject}
+        onToggleArtifact={handleToggleArtifact}
+        onRemoveFile={(index) =>
+          setAttachedFiles((current) => current.filter((_, i) => i !== index))
+        }
+        onRemoveImage={(index) =>
+          setAttachedImages((current) => current.filter((_, i) => i !== index))
+        }
+        onRemoveProject={(projectId) =>
+          setSelectedProjectIds((current) =>
+            current.filter((id) => id !== projectId)
+          )
+        }
+        onRemoveArtifact={(artifactId) =>
+          setSelectedArtifactIds((current) =>
+            current.filter((id) => id !== artifactId)
+          )
+        }
+        textareaRef={textareaRef}
+      />
     </div>
   );
 }
