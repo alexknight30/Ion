@@ -1,8 +1,11 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Navbar, type Tab } from "@/components/Navbar";
-import { AgentButton } from "@/components/AgentButton";
+import {
+  AgentButton,
+  type AgentButtonState,
+} from "@/components/AgentButton";
 import { Surface } from "@/components/ui/Surface";
 import { Label } from "@/components/ui/Label";
 import { ProjectsPanel } from "@/components/workstation/ProjectsPanel";
@@ -81,15 +84,6 @@ function OrganizeView({
           selectedDate={selectedDate}
           onSelectDate={setSelectedDate}
         />
-        {inboxExpanded ? (
-          <div className="relative z-20 mt-auto shrink-0 overflow-visible">
-            <AgentButton
-              variant="embedded"
-              defaultOpen
-              placeholder="Need help drafting?"
-            />
-          </div>
-        ) : null}
       </div>
       <TodoListPanel
         selectedDate={selectedDate}
@@ -198,7 +192,28 @@ const tabLayout: Record<Tab, string> = {
 export default function Home() {
   const [activeTab, setActiveTab] = useState<Tab>("Organize");
   const [inboxExpanded, setInboxExpanded] = useState(false);
+  const [agentOpen, setAgentOpen] = useState(false);
+  const [agentDocked, setAgentDocked] = useState(false);
+  const [agentQuery, setAgentQuery] = useState("");
+  const wasEmailModeRef = useRef(false);
+
   const emailModeOnOrganize = activeTab === "Organize" && inboxExpanded;
+
+  const agentState: AgentButtonState = {
+    open: agentOpen,
+    docked: agentDocked,
+    query: agentQuery,
+    onOpenChange: setAgentOpen,
+    onDockedChange: setAgentDocked,
+    onQueryChange: setAgentQuery,
+  };
+
+  useEffect(() => {
+    if (emailModeOnOrganize && !wasEmailModeRef.current && !agentDocked) {
+      setAgentOpen(true);
+    }
+    wasEmailModeRef.current = emailModeOnOrganize;
+  }, [emailModeOnOrganize, agentDocked]);
 
   return (
     <div className="flex h-dvh flex-col overflow-hidden">
@@ -219,8 +234,13 @@ export default function Home() {
           </div>
         ))}
       </main>
-      {activeTab !== "Chat" && !emailModeOnOrganize ? (
-        <AgentButton placeholder="Ask Ion" />
+      {activeTab !== "Chat" ? (
+        <AgentButton
+          {...agentState}
+          placeholder={
+            emailModeOnOrganize ? "Need help drafting?" : "Ask Ion"
+          }
+        />
       ) : null}
     </div>
   );

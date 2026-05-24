@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/cn";
@@ -12,22 +12,30 @@ const LEFT_OFFSET_PX = 24; // left-6
 // Slide left until only the right third of the button remains visible
 const DOCKED_OFFSET_PX = LEFT_OFFSET_PX + (BUTTON_SIZE_PX * 2) / 3;
 
-interface AgentButtonProps {
-  variant?: "floating" | "embedded";
-  defaultOpen?: boolean;
+export interface AgentButtonState {
+  open: boolean;
+  docked: boolean;
+  query: string;
+  onOpenChange: (open: boolean) => void;
+  onDockedChange: (docked: boolean) => void;
+  onQueryChange: (query: string) => void;
+}
+
+interface AgentButtonProps extends AgentButtonState {
   placeholder?: string;
   className?: string;
 }
 
 export function AgentButton({
-  variant = "floating",
-  defaultOpen = false,
   placeholder = "Ask Ion",
   className,
+  open,
+  docked,
+  query,
+  onOpenChange,
+  onDockedChange,
+  onQueryChange,
 }: AgentButtonProps) {
-  const [open, setOpen] = useState(defaultOpen);
-  const [docked, setDocked] = useState(false);
-  const [query, setQuery] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
   const clickTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -52,7 +60,7 @@ export function AgentButton({
 
   function handleClick() {
     if (docked) {
-      setDocked(false);
+      onDockedChange(false);
       return;
     }
 
@@ -61,7 +69,7 @@ export function AgentButton({
     }
 
     clickTimerRef.current = setTimeout(() => {
-      setOpen((prev) => !prev);
+      onOpenChange(!open);
       clickTimerRef.current = null;
     }, CLICK_DELAY_MS);
   }
@@ -74,17 +82,14 @@ export function AgentButton({
       clickTimerRef.current = null;
     }
 
-    setOpen(false);
-    setDocked(true);
+    onOpenChange(false);
+    onDockedChange(true);
   }
 
   return (
     <motion.div
       className={cn(
-        "flex w-auto items-center gap-3 overflow-visible",
-        variant === "floating"
-          ? "fixed bottom-6 left-6 z-50"
-          : "relative z-20",
+        "fixed bottom-6 left-6 z-50 flex w-auto items-center gap-3 overflow-visible",
         className
       )}
       animate={{ x: docked ? -DOCKED_OFFSET_PX : 0 }}
@@ -92,13 +97,9 @@ export function AgentButton({
     >
       <motion.button
         type="button"
-        initial={variant === "floating" ? { opacity: 0, y: 12 } : undefined}
-        animate={variant === "floating" ? { opacity: 1, y: 0 } : undefined}
-        transition={
-          variant === "floating"
-            ? { duration: 0.5, delay: 0.3, ease }
-            : undefined
-        }
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, delay: 0.3, ease }}
         onClick={handleClick}
         onDoubleClick={handleDoubleClick}
         aria-label={
@@ -131,7 +132,7 @@ export function AgentButton({
                 ref={inputRef}
                 type="text"
                 value={query}
-                onChange={(e) => setQuery(e.target.value)}
+                onChange={(e) => onQueryChange(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === "Enter") handleSend();
                 }}
