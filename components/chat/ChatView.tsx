@@ -7,18 +7,22 @@ import {
   ChevronDown,
   Clock,
   Download,
+  FileText,
+  Image as ImageIcon,
   LayoutGrid,
   PanelLeft,
   Plus,
   Search,
   Share2,
   SquarePen,
+  X,
 } from "lucide-react";
 import Image from "next/image";
 import { cn } from "@/lib/cn";
 import { getMockChatResponse } from "@/lib/chat-mock";
 import { getRandomChatGreeting } from "@/lib/chat-greetings";
 import { fetchProfile, getFirstName } from "@/lib/profile";
+import { fetchProjects, type Project } from "@/lib/projects";
 
 interface Message {
   id: string;
@@ -174,58 +178,295 @@ function ThinkingIndicator() {
   );
 }
 
+function ProjectColorDot({ color }: { color: string | null }) {
+  if (!color) return <span className="h-3 w-3 shrink-0" aria-hidden />;
+
+  return (
+    <span
+      className="h-3 w-3 shrink-0 rounded-full"
+      style={{ backgroundColor: color }}
+      aria-hidden
+    />
+  );
+}
+
+function ChatAttachmentMenu({
+  open,
+  projects,
+  selectedProjectIds,
+  onAddFiles,
+  onAddImage,
+  onToggleProject,
+}: {
+  open: boolean;
+  projects: Project[];
+  selectedProjectIds: string[];
+  onAddFiles: () => void;
+  onAddImage: () => void;
+  onToggleProject: (projectId: string) => void;
+}) {
+  if (!open) return null;
+
+  return (
+    <ul
+      role="menu"
+      aria-label="Add to chat"
+      className="absolute bottom-[calc(100%+8px)] left-0 z-20 w-56 overflow-hidden rounded-[10px] border border-[var(--color-border-subtle)] bg-[var(--color-obsidian)] py-1 shadow-[0_4px_24px_var(--color-shadow-soft)]"
+    >
+      <li role="none">
+        <button
+          type="button"
+          role="menuitem"
+          onClick={onAddFiles}
+          className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-[13px] tracking-[-0.01em] text-[var(--color-bone)] transition-colors duration-200 hover:bg-[var(--color-ash)]"
+        >
+          <FileText size={15} strokeWidth={1.5} className="shrink-0 text-[var(--color-steam)]" />
+          Add files
+        </button>
+      </li>
+      <li role="none">
+        <button
+          type="button"
+          role="menuitem"
+          onClick={onAddImage}
+          className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-[13px] tracking-[-0.01em] text-[var(--color-bone)] transition-colors duration-200 hover:bg-[var(--color-ash)]"
+        >
+          <ImageIcon size={15} strokeWidth={1.5} className="shrink-0 text-[var(--color-steam)]" />
+          Add image
+        </button>
+      </li>
+
+      <li role="separator" aria-hidden className="my-1 h-px bg-[var(--color-border-subtle)]" />
+
+      {projects.length === 0 ? (
+        <li className="px-3 py-2 text-[12px] text-[var(--color-pumice)]">
+          No projects yet
+        </li>
+      ) : (
+        projects.map((project) => {
+          const selected = selectedProjectIds.includes(project.id);
+          return (
+            <li key={project.id} role="none">
+              <button
+                type="button"
+                role="menuitemcheckbox"
+                aria-checked={selected}
+                onClick={() => onToggleProject(project.id)}
+                className={cn(
+                  "flex w-full items-center justify-between gap-3 px-3 py-2 text-left transition-colors duration-200 hover:bg-[var(--color-ash)]",
+                  selected && "bg-[var(--color-ash)]"
+                )}
+              >
+                <span className="min-w-0 truncate text-[13px] tracking-[-0.01em] text-[var(--color-bone)]">
+                  {project.name}
+                </span>
+                <ProjectColorDot color={project.color} />
+              </button>
+            </li>
+          );
+        })
+      )}
+    </ul>
+  );
+}
+
 function ChatComposer({
   input,
   canSend,
+  projects,
+  files,
+  images,
+  selectedProjects,
   onInputChange,
   onSend,
   onKeyDown,
+  onAddFiles,
+  onAddImages,
+  onToggleProject,
+  onRemoveFile,
+  onRemoveImage,
+  onRemoveProject,
   textareaRef,
 }: {
   input: string;
   canSend: boolean;
+  projects: Project[];
+  files: File[];
+  images: File[];
+  selectedProjects: Project[];
   onInputChange: (value: string) => void;
   onSend: () => void;
   onKeyDown: (event: React.KeyboardEvent<HTMLTextAreaElement>) => void;
+  onAddFiles: (files: FileList | null) => void;
+  onAddImages: (files: FileList | null) => void;
+  onToggleProject: (projectId: string) => void;
+  onRemoveFile: (index: number) => void;
+  onRemoveImage: (index: number) => void;
+  onRemoveProject: (projectId: string) => void;
   textareaRef: React.RefObject<HTMLTextAreaElement | null>;
 }) {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
+  const hasAttachments =
+    files.length > 0 || images.length > 0 || selectedProjects.length > 0;
+
+  useEffect(() => {
+    function handlePointerDown(event: PointerEvent) {
+      if (!menuRef.current?.contains(event.target as Node)) {
+        setMenuOpen(false);
+      }
+    }
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    return () => document.removeEventListener("pointerdown", handlePointerDown);
+  }, []);
+
+  function handleAddFilesClick() {
+    fileInputRef.current?.click();
+    setMenuOpen(false);
+  }
+
+  function handleAddImageClick() {
+    imageInputRef.current?.click();
+    setMenuOpen(false);
+  }
+
   return (
     <div className="shrink-0 px-4 pb-4 pt-2 md:px-6">
       <div className="mx-auto w-full max-w-3xl">
-        <div className="flex items-end gap-2 rounded-[16px] border border-[var(--color-border-active)] bg-[var(--color-obsidian)] px-3 py-2 shadow-[0_2px_12px_var(--color-shadow-soft),0_0_0_1px_var(--color-border-subtle)]">
-          <button
-            type="button"
-            aria-label="Add attachment"
-            className="mb-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-[8px] text-[var(--color-pumice)] transition-colors duration-200 hover:bg-[var(--color-ash)] hover:text-[var(--color-steam)]"
-          >
-            <Plus size={18} strokeWidth={1.5} />
-          </button>
+        <div className="rounded-[16px] border border-[var(--color-border-active)] bg-[var(--color-obsidian)] px-3 py-2 shadow-[0_2px_12px_var(--color-shadow-soft),0_0_0_1px_var(--color-border-subtle)]">
+          {hasAttachments ? (
+            <div className="mb-2 flex flex-wrap gap-2 border-b border-[var(--color-border-subtle)] pb-2">
+              {files.map((file, index) => (
+                <span
+                  key={`file-${file.name}-${index}`}
+                  className="inline-flex max-w-full items-center gap-1.5 rounded-[8px] bg-[var(--color-ash)] py-1 pl-2 pr-1 text-[12px] text-[var(--color-bone)]"
+                >
+                  <FileText size={13} strokeWidth={1.5} className="shrink-0 text-[var(--color-steam)]" />
+                  <span className="truncate">{file.name}</span>
+                  <button
+                    type="button"
+                    aria-label={`Remove ${file.name}`}
+                    onClick={() => onRemoveFile(index)}
+                    className="flex h-5 w-5 shrink-0 items-center justify-center rounded-[4px] text-[var(--color-pumice)] transition-colors duration-200 hover:bg-[var(--color-frost)] hover:text-[var(--color-bone)]"
+                  >
+                    <X size={12} strokeWidth={1.5} />
+                  </button>
+                </span>
+              ))}
+              {images.map((file, index) => (
+                <span
+                  key={`image-${file.name}-${index}`}
+                  className="inline-flex max-w-full items-center gap-1.5 rounded-[8px] bg-[var(--color-ash)] py-1 pl-2 pr-1 text-[12px] text-[var(--color-bone)]"
+                >
+                  <ImageIcon size={13} strokeWidth={1.5} className="shrink-0 text-[var(--color-steam)]" />
+                  <span className="truncate">{file.name}</span>
+                  <button
+                    type="button"
+                    aria-label={`Remove ${file.name}`}
+                    onClick={() => onRemoveImage(index)}
+                    className="flex h-5 w-5 shrink-0 items-center justify-center rounded-[4px] text-[var(--color-pumice)] transition-colors duration-200 hover:bg-[var(--color-frost)] hover:text-[var(--color-bone)]"
+                  >
+                    <X size={12} strokeWidth={1.5} />
+                  </button>
+                </span>
+              ))}
+              {selectedProjects.map((project) => (
+                <span
+                  key={project.id}
+                  className="inline-flex max-w-full items-center gap-1.5 rounded-[8px] bg-[var(--color-ash)] py-1 pl-2 pr-1 text-[12px] text-[var(--color-bone)]"
+                >
+                  <ProjectColorDot color={project.color} />
+                  <span className="truncate">{project.name}</span>
+                  <button
+                    type="button"
+                    aria-label={`Remove ${project.name}`}
+                    onClick={() => onRemoveProject(project.id)}
+                    className="flex h-5 w-5 shrink-0 items-center justify-center rounded-[4px] text-[var(--color-pumice)] transition-colors duration-200 hover:bg-[var(--color-frost)] hover:text-[var(--color-bone)]"
+                  >
+                    <X size={12} strokeWidth={1.5} />
+                  </button>
+                </span>
+              ))}
+            </div>
+          ) : null}
 
-          <textarea
-            ref={textareaRef}
-            value={input}
-            onChange={(event) => onInputChange(event.target.value)}
-            onKeyDown={onKeyDown}
-            placeholder="Ask Ion"
-            rows={1}
-            className="mb-0.5 block max-h-40 min-h-8 w-full flex-1 resize-none overflow-hidden border-0 bg-transparent p-0 text-[15px] leading-8 outline-none placeholder:text-[var(--color-pumice)]"
-            style={{ height: "32px" }}
-          />
+          <div className="flex items-end gap-2">
+            <div ref={menuRef} className="relative shrink-0">
+              <button
+                type="button"
+                aria-label="Add attachment"
+                aria-haspopup="menu"
+                aria-expanded={menuOpen}
+                onClick={() => setMenuOpen((current) => !current)}
+                className={cn(
+                  "mb-0.5 flex h-8 w-8 items-center justify-center rounded-[8px] text-[var(--color-pumice)] transition-colors duration-200 hover:bg-[var(--color-ash)] hover:text-[var(--color-steam)]",
+                  menuOpen && "bg-[var(--color-ash)] text-[var(--color-steam)]"
+                )}
+              >
+                <Plus size={18} strokeWidth={1.5} />
+              </button>
 
-          <button
-            type="button"
-            onClick={onSend}
-            disabled={!canSend}
-            aria-label="Send message"
-            className={cn(
-              "mb-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-[background-color,color,opacity] duration-200",
-              canSend
-                ? "bg-[var(--color-glacier)] text-[var(--color-obsidian)] hover:bg-[var(--color-bone)]"
-                : "bg-[var(--color-frost)] text-[var(--color-pumice)]"
-            )}
-          >
-            <ArrowUp size={16} strokeWidth={2} />
-          </button>
+              <ChatAttachmentMenu
+                open={menuOpen}
+                projects={projects}
+                selectedProjectIds={selectedProjects.map((project) => project.id)}
+                onAddFiles={handleAddFilesClick}
+                onAddImage={handleAddImageClick}
+                onToggleProject={onToggleProject}
+              />
+            </div>
+
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              className="hidden"
+              onChange={(event) => {
+                onAddFiles(event.target.files);
+                event.target.value = "";
+              }}
+            />
+            <input
+              ref={imageInputRef}
+              type="file"
+              accept="image/*"
+              multiple
+              className="hidden"
+              onChange={(event) => {
+                onAddImages(event.target.files);
+                event.target.value = "";
+              }}
+            />
+
+            <textarea
+              ref={textareaRef}
+              value={input}
+              onChange={(event) => onInputChange(event.target.value)}
+              onKeyDown={onKeyDown}
+              placeholder="Ask Ion"
+              rows={1}
+              className="mb-0.5 block max-h-40 min-h-8 w-full flex-1 resize-none overflow-hidden border-0 bg-transparent p-0 text-[15px] leading-8 outline-none placeholder:text-[var(--color-pumice)]"
+              style={{ height: "32px" }}
+            />
+
+            <button
+              type="button"
+              onClick={onSend}
+              disabled={!canSend}
+              aria-label="Send message"
+              className={cn(
+                "mb-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-[background-color,color,opacity] duration-200",
+                canSend
+                  ? "bg-[var(--color-glacier)] text-[var(--color-obsidian)] hover:bg-[var(--color-bone)]"
+                  : "bg-[var(--color-frost)] text-[var(--color-pumice)]"
+              )}
+            >
+              <ArrowUp size={16} strokeWidth={2} />
+            </button>
+          </div>
         </div>
 
         <p className="mt-2 text-center text-[12px] tracking-[-0.01em] text-[var(--color-pumice)]">
@@ -242,9 +483,17 @@ export function ChatView() {
   const [isThinking, setIsThinking] = useState(false);
   const [greeting, setGreeting] = useState("Ask Ion");
   const [profileInitial, setProfileInitial] = useState("A");
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
+  const [attachedImages, setAttachedImages] = useState<File[]>([]);
+  const [selectedProjectIds, setSelectedProjectIds] = useState<string[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const pendingReply = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const selectedProjects = projects.filter((project) =>
+    selectedProjectIds.includes(project.id)
+  );
 
   const canSend = input.trim().length > 0 && !isThinking;
   const chatTitle =
@@ -264,6 +513,22 @@ export function ChatView() {
         if (!cancelled) {
           setGreeting(getRandomChatGreeting(""));
         }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    fetchProjects()
+      .then((data) => {
+        if (!cancelled) setProjects(data);
+      })
+      .catch(() => {
+        if (!cancelled) setProjects([]);
       });
 
     return () => {
@@ -325,6 +590,24 @@ export function ChatView() {
     }
   }
 
+  function handleAddFiles(fileList: FileList | null) {
+    if (!fileList?.length) return;
+    setAttachedFiles((current) => [...current, ...Array.from(fileList)]);
+  }
+
+  function handleAddImages(fileList: FileList | null) {
+    if (!fileList?.length) return;
+    setAttachedImages((current) => [...current, ...Array.from(fileList)]);
+  }
+
+  function handleToggleProject(projectId: string) {
+    setSelectedProjectIds((current) =>
+      current.includes(projectId)
+        ? current.filter((id) => id !== projectId)
+        : [...current, projectId]
+    );
+  }
+
   return (
     <div className="flex h-full min-h-0 bg-[var(--color-void)]">
       <ChatSidebar profileInitial={profileInitial} />
@@ -360,9 +643,27 @@ export function ChatView() {
         <ChatComposer
           input={input}
           canSend={canSend}
+          projects={projects}
+          files={attachedFiles}
+          images={attachedImages}
+          selectedProjects={selectedProjects}
           onInputChange={setInput}
           onSend={handleSend}
           onKeyDown={handleKeyDown}
+          onAddFiles={handleAddFiles}
+          onAddImages={handleAddImages}
+          onToggleProject={handleToggleProject}
+          onRemoveFile={(index) =>
+            setAttachedFiles((current) => current.filter((_, i) => i !== index))
+          }
+          onRemoveImage={(index) =>
+            setAttachedImages((current) => current.filter((_, i) => i !== index))
+          }
+          onRemoveProject={(projectId) =>
+            setSelectedProjectIds((current) =>
+              current.filter((id) => id !== projectId)
+            )
+          }
           textareaRef={textareaRef}
         />
       </div>
