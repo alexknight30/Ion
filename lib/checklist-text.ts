@@ -142,6 +142,21 @@ export function insertChecklistLine(lines: TextLine[], lineIndex: number): {
   return { lines: next, focusLineIndex: lineIndex + 1 };
 }
 
+export function exitChecklistLine(lines: TextLine[], lineIndex: number): {
+  lines: TextLine[];
+  focusLineIndex: number;
+} {
+  const next = [...lines];
+  const current = next[lineIndex];
+
+  if (!current || current.kind !== "checklist") {
+    return { lines, focusLineIndex: lineIndex };
+  }
+
+  next[lineIndex] = { kind: "text", content: "" };
+  return { lines: next, focusLineIndex: lineIndex };
+}
+
 export function getSelectionLineRange(
   container: HTMLElement
 ): { startLine: number; endLine: number } | null {

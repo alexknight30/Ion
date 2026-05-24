@@ -10,6 +10,7 @@ import {
 } from "react";
 import { cn } from "@/lib/cn";
 import {
+  exitChecklistLine,
   getFocusedLineIndex,
   getSelectionLineRange,
   insertChecklistLine,
@@ -298,6 +299,23 @@ function shouldHandleChecklistShortcut(root: HTMLElement) {
   return root.contains(selection.getRangeAt(0).commonAncestorContainer);
 }
 
+function hasNonCollapsedSelection(root: HTMLElement) {
+  const selection = window.getSelection();
+  if (!selection || selection.isCollapsed || selection.rangeCount === 0) {
+    return false;
+  }
+
+  return root.contains(selection.getRangeAt(0).commonAncestorContainer);
+}
+
+function isUndoShortcut(event: ReactKeyboardEvent | globalThis.KeyboardEvent) {
+  return (
+    (event.metaKey || event.ctrlKey) &&
+    !event.altKey &&
+    event.key.toLowerCase() === "z"
+  );
+}
+
 export const TextArtifactEditor = forwardRef<
   TextArtifactEditorHandle,
   TextArtifactEditorProps
@@ -305,10 +323,24 @@ export const TextArtifactEditor = forwardRef<
   const editorRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef(content);
   const isLocalEditRef = useRef(false);
+  const undoStackRef = useRef<string[]>([]);
+  const redoStackRef = useRef<string[]>([]);
 
-  const commit = useCallback(
-    (lines: TextLine[], focusLineIndex?: number, focusOffset?: number) => {
-      const serialized = serializeTextArtifactContent(lines);
+  const recordUndo = useCallback(() => {
+    const current = contentRef.current;
+    if (undoStackRef.current.at(-1) === current) {
+      return;
+    }
+
+    undoStackRef.current.push(current);
+    if (undoStackRef.current.length > 100) {
+      undoStackRef.current.shift();
+    }
+    redoStackRef.current = [];
+  }, []);
+
+  const applySerializedContent = useCallback(
+    (serialized: string, focusLineIndex?: number, focusOffset?: number) => {
       contentRef.current = serialized;
       onContentChange(serialized);
 
@@ -316,7 +348,7 @@ export const TextArtifactEditor = forwardRef<
       if (!root) return;
 
       isLocalEditRef.current = true;
-      renderLinesToEditor(root, lines);
+      renderLinesToEditor(root, parseTextArtifactContent(serialized));
 
       if (focusLineIndex !== undefined) {
         requestAnimationFrame(() => {
@@ -327,6 +359,40 @@ export const TextArtifactEditor = forwardRef<
     },
     [onContentChange]
   );
+
+  const commit = useCallback(
+    (lines: TextLine[], focusLineIndex?: number, focusOffset?: number) => {
+      recordUndo();
+      applySerializedContent(
+        serializeTextArtifactContent(lines),
+        focusLineIndex,
+        focusOffset
+      );
+    },
+    [applySerializedContent, recordUndo]
+  );
+
+  const undo = useCallback(() => {
+    const previous = undoStackRef.current.pop();
+    if (previous === undefined) {
+      return false;
+    }
+
+    redoStackRef.current.push(contentRef.current);
+    applySerializedContent(previous);
+    return true;
+  }, [applySerializedContent]);
+
+  const redo = useCallback(() => {
+    const next = redoStackRef.current.pop();
+    if (next === undefined) {
+      return false;
+    }
+
+    undoStackRef.current.push(contentRef.current);
+    applySerializedContent(next);
+    return true;
+  }, [applySerializedContent]);
 
   const syncFromDom = useCallback(() => {
     const root = editorRef.current;
@@ -359,11 +425,23 @@ export const TextArtifactEditor = forwardRef<
     }
 
     const lineIndex = getFocusedLineIndex(root);
-    const { lines: nextLines, focusLineIndex } = insertChecklistLine(
-      currentLines,
-      lineIndex
-    );
-    commit(nextLines, focusLineIndex);
+    const current = currentLines[lineIndex];
+
+    if (current?.kind === "checklist") {
+      commit(toggleLinesChecklist(currentLines, lineIndex, lineIndex), lineIndex);
+      return;
+    }
+
+    if (current?.kind === "text" && current.content.trim() === "") {
+      const { lines: nextLines, focusLineIndex } = insertChecklistLine(
+        currentLines,
+        lineIndex
+      );
+      commit(nextLines, focusLineIndex);
+      return;
+    }
+
+    commit(toggleLinesChecklist(currentLines, lineIndex, lineIndex), lineIndex);
   }, [commit]);
 
   useImperativeHandle(ref, () => ({ insertChecklist }), [insertChecklist]);
@@ -401,10 +479,13 @@ export const TextArtifactEditor = forwardRef<
     }
 
     contentRef.current = content;
+    undoStackRef.current = [];
+    redoStackRef.current = [];
     renderLinesToEditor(root, parseTextArtifactContent(content));
   }, [content]);
 
   function handleInput() {
+    recordUndo();
     syncFromDom();
   }
 
@@ -425,6 +506,7 @@ export const TextArtifactEditor = forwardRef<
 
     event.preventDefault();
 
+    recordUndo();
     const checked = row.getAttribute("data-checked") === "true";
     updateChecklistRowVisual(row, !checked);
     syncFromDom();
@@ -433,6 +515,16 @@ export const TextArtifactEditor = forwardRef<
   function handleKeyDown(event: ReactKeyboardEvent<HTMLDivElement>) {
     const root = editorRef.current;
     if (!root) return;
+
+    if (isUndoShortcut(event.nativeEvent)) {
+      event.preventDefault();
+      if (event.shiftKey) {
+        redo();
+      } else {
+        undo();
+      }
+      return;
+    }
 
     if (isChecklistShortcut(event.nativeEvent)) {
       event.preventDefault();
@@ -447,6 +539,16 @@ export const TextArtifactEditor = forwardRef<
 
       if (current?.kind === "checklist") {
         event.preventDefault();
+
+        if (current.content.trim() === "") {
+          const { lines: nextLines, focusLineIndex } = exitChecklistLine(
+            lines,
+            lineIndex
+          );
+          commit(nextLines, focusLineIndex);
+          return;
+        }
+
         const next = [...lines];
         next.splice(lineIndex + 1, 0, {
           kind: "checklist",
@@ -460,6 +562,10 @@ export const TextArtifactEditor = forwardRef<
     }
 
     if (event.key === "Backspace") {
+      if (hasNonCollapsedSelection(root)) {
+        return;
+      }
+
       const lineIndex = getCaretLineIndex(root);
       const offset = getCaretOffsetInLine(root);
 
