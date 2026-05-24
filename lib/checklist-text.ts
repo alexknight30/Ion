@@ -1,10 +1,96 @@
 export type TextLine =
-  | { kind: "text"; content: string }
-  | { kind: "checklist"; content: string; checked: boolean };
+  | { kind: "text"; content: string; indent?: number }
+  | { kind: "checklist"; content: string; checked: boolean; indent?: number };
 
-const CHECKLIST_CHECKED_PATTERN = /^\[x\] (.*)$/i;
-const CHECKLIST_UNCHECKED_PATTERN = /^\[ \] (.*)$/;
+export const INDENT_SPACES = 2;
+export const MAX_INDENT = 8;
+
+const CHECKLIST_LINE_PATTERN = /^(\s*)\[( |x)\] (.*)$/i;
 const BULLET_PATTERN = /^(\s*)-\s+(.*)$/;
+
+export function isBulletTextLine(line: TextLine): boolean {
+  return line.kind === "text" && BULLET_PATTERN.test(line.content);
+}
+
+export function canIndentLine(line: TextLine): boolean {
+  return line.kind === "checklist" || isBulletTextLine(line);
+}
+
+function getBulletParts(content: string) {
+  const match = content.match(BULLET_PATTERN);
+  if (!match) return null;
+  return {
+    spaces: match[1],
+    text: match[2],
+  };
+}
+
+export function indentLine(line: TextLine): TextLine {
+  if (line.kind === "checklist") {
+    const indent = Math.min(MAX_INDENT, (line.indent ?? 0) + 1);
+    return { ...line, indent };
+  }
+
+  if (isBulletTextLine(line)) {
+    const parts = getBulletParts(line.content);
+    if (!parts) return line;
+    return {
+      kind: "text",
+      content: `${parts.spaces}${" ".repeat(INDENT_SPACES)}- ${parts.text}`,
+    };
+  }
+
+  return line;
+}
+
+export function outdentLine(line: TextLine): TextLine {
+  if (line.kind === "checklist") {
+    const indent = Math.max(0, (line.indent ?? 0) - 1);
+    return { ...line, indent };
+  }
+
+  if (isBulletTextLine(line)) {
+    const parts = getBulletParts(line.content);
+    if (!parts || parts.spaces.length < INDENT_SPACES) {
+      return line;
+    }
+
+    return {
+      kind: "text",
+      content: `${parts.spaces.slice(INDENT_SPACES)}- ${parts.text}`,
+    };
+  }
+
+  return line;
+}
+
+export function indentLineRange(
+  lines: TextLine[],
+  startLine: number,
+  endLine: number
+): TextLine[] {
+  return lines.map((line, index) => {
+    if (index < startLine || index > endLine || !canIndentLine(line)) {
+      return line;
+    }
+
+    return indentLine(line);
+  });
+}
+
+export function outdentLineRange(
+  lines: TextLine[],
+  startLine: number,
+  endLine: number
+): TextLine[] {
+  return lines.map((line, index) => {
+    if (index < startLine || index > endLine || !canIndentLine(line)) {
+      return line;
+    }
+
+    return outdentLine(line);
+  });
+}
 
 export function parseTextArtifactContent(raw: string): TextLine[] {
   if (!raw) {
@@ -12,21 +98,13 @@ export function parseTextArtifactContent(raw: string): TextLine[] {
   }
 
   return raw.split("\n").map((line) => {
-    const checkedMatch = line.match(CHECKLIST_CHECKED_PATTERN);
-    if (checkedMatch) {
+    const checklistMatch = line.match(CHECKLIST_LINE_PATTERN);
+    if (checklistMatch) {
       return {
         kind: "checklist",
-        content: checkedMatch[1],
-        checked: true,
-      };
-    }
-
-    const uncheckedMatch = line.match(CHECKLIST_UNCHECKED_PATTERN);
-    if (uncheckedMatch) {
-      return {
-        kind: "checklist",
-        content: uncheckedMatch[1],
-        checked: false,
+        content: checklistMatch[3],
+        checked: checklistMatch[2].toLowerCase() === "x",
+        indent: Math.floor(checklistMatch[1].length / INDENT_SPACES),
       };
     }
 
@@ -38,7 +116,10 @@ export function serializeTextArtifactContent(lines: TextLine[]): string {
   return lines
     .map((line) => {
       if (line.kind === "checklist") {
-        return line.checked ? `[x] ${line.content}` : `[ ] ${line.content}`;
+        const prefix = " ".repeat((line.indent ?? 0) * INDENT_SPACES);
+        return line.checked
+          ? `${prefix}[x] ${line.content}`
+          : `${prefix}[ ] ${line.content}`;
       }
 
       return line.content;
@@ -52,12 +133,13 @@ export function convertLineToText(line: TextLine): TextLine {
   }
 
   if (line.content.trim() === "") {
-    return { kind: "text", content: "" };
+    return { kind: "text", content: "", indent: line.indent };
   }
 
+  const prefix = " ".repeat((line.indent ?? 0) * INDENT_SPACES);
   return {
     kind: "text",
-    content: `- ${line.content}`,
+    content: `${prefix}- ${line.content}`,
   };
 }
 
@@ -72,6 +154,7 @@ export function convertLineToChecklist(line: TextLine): TextLine {
       kind: "checklist",
       content: bulletMatch[2],
       checked: false,
+      indent: Math.floor(bulletMatch[1].length / INDENT_SPACES),
     };
   }
 
@@ -83,6 +166,7 @@ export function convertLineToChecklist(line: TextLine): TextLine {
     kind: "checklist",
     content: line.content,
     checked: false,
+    indent: line.indent,
   };
 }
 
@@ -127,9 +211,16 @@ export function insertChecklistLine(lines: TextLine[], lineIndex: number): {
 } {
   const next = [...lines];
   const current = next[lineIndex];
+  const inheritedIndent =
+    current?.kind === "checklist" ? current.indent ?? 0 : current?.indent ?? 0;
 
-  if (!current || current.kind === "text" && current.content.trim() === "") {
-    next[lineIndex] = { kind: "checklist", content: "", checked: false };
+  if (!current || (current.kind === "text" && current.content.trim() === "")) {
+    next[lineIndex] = {
+      kind: "checklist",
+      content: "",
+      checked: false,
+      indent: inheritedIndent,
+    };
     return { lines: next, focusLineIndex: lineIndex };
   }
 
@@ -137,6 +228,7 @@ export function insertChecklistLine(lines: TextLine[], lineIndex: number): {
     kind: "checklist",
     content: "",
     checked: false,
+    indent: current.kind === "checklist" ? current.indent ?? 0 : inheritedIndent,
   });
 
   return { lines: next, focusLineIndex: lineIndex + 1 };
@@ -153,7 +245,7 @@ export function exitChecklistLine(lines: TextLine[], lineIndex: number): {
     return { lines, focusLineIndex: lineIndex };
   }
 
-  next[lineIndex] = { kind: "text", content: "" };
+  next[lineIndex] = { kind: "text", content: "", indent: current.indent };
   return { lines: next, focusLineIndex: lineIndex };
 }
 

@@ -10,10 +10,13 @@ import {
 } from "react";
 import { cn } from "@/lib/cn";
 import {
+  canIndentLine,
   exitChecklistLine,
   getFocusedLineIndex,
   getSelectionLineRange,
+  indentLineRange,
   insertChecklistLine,
+  outdentLineRange,
   parseTextArtifactContent,
   serializeTextArtifactContent,
   toggleLinesChecklist,
@@ -36,6 +39,15 @@ const LINE_CLASS =
 const CHECKLIST_TEXT_CLASS =
   "min-h-[1.6em] min-w-[2px] flex-1 whitespace-pre-wrap break-words outline-none";
 const CHECKLIST_ROW_CLASS = "flex items-start gap-2";
+const INDENT_PADDING_PX = 16;
+
+function getChecklistIndentPadding(line: TextLine) {
+  if (line.kind !== "checklist") {
+    return 0;
+  }
+
+  return (line.indent ?? 0) * INDENT_PADDING_PX;
+}
 
 function createBubbleElement(checked: boolean) {
   const bubble = document.createElement("span");
@@ -112,7 +124,9 @@ function renderLinesToEditor(root: HTMLElement, lines: TextLine[]) {
       row.setAttribute("data-line-index", String(index));
       row.setAttribute("data-line-kind", "checklist");
       row.setAttribute("data-checked", String(line.checked));
+      row.setAttribute("data-line-indent", String(line.indent ?? 0));
       row.className = cn(CHECKLIST_ROW_CLASS, index < lines.length - 1 && "mb-1.5");
+      row.style.paddingLeft = `${getChecklistIndentPadding(line)}px`;
 
       const text = document.createElement("span");
       text.setAttribute("data-line-text", "true");
@@ -150,6 +164,7 @@ function parseEditorDom(root: HTMLElement): TextLine[] {
         return {
           kind: "checklist" as const,
           checked: child.getAttribute("data-checked") === "true",
+          indent: Number(child.getAttribute("data-line-indent") ?? 0),
           content: readChecklistTextContent(
             child.querySelector("[data-line-text]")
           ),
@@ -660,6 +675,35 @@ export const TextArtifactEditor = forwardRef<
     if (isChecklistShortcut(event.nativeEvent)) {
       event.preventDefault();
       insertChecklist();
+      return;
+    }
+
+    if (event.key === "Tab") {
+      const lineIndex = getCaretLineIndex(root);
+      const selectionRange = getSelectionLineRange(root);
+      const startLine = selectionRange?.startLine ?? lineIndex;
+      const endLine = selectionRange?.endLine ?? lineIndex;
+      const lines = parseEditorDom(root);
+      const hasIndentableLines = lines
+        .slice(startLine, endLine + 1)
+        .some(canIndentLine);
+
+      if (!hasIndentableLines) {
+        return;
+      }
+
+      event.preventDefault();
+
+      const next = event.shiftKey
+        ? outdentLineRange(lines, startLine, endLine)
+        : indentLineRange(lines, startLine, endLine);
+
+      commit(
+        next,
+        lineIndex,
+        getCaretOffsetInLine(root),
+        selectionRange ?? undefined
+      );
       return;
     }
 
