@@ -12,8 +12,9 @@ import {
 import Image from "next/image";
 import { SmartTextarea } from "@/components/ui/SmartTextarea";
 import { cn } from "@/lib/cn";
-import { getMockChatResponse } from "@/lib/chat-mock";
 import { getRandomChatGreeting } from "@/lib/chat-greetings";
+import { sendAgentMessage } from "@/lib/agent";
+import { getTodayDate, toDateKey } from "@/lib/calendar";
 import { fetchProfile, getFirstName } from "@/lib/profile";
 import { fetchProjects, type Project } from "@/lib/projects";
 import { fetchArtifacts, type Artifact } from "@/lib/artifacts";
@@ -548,6 +549,8 @@ export function ChatView() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isThinking, setIsThinking] = useState(false);
+  const [conversationId, setConversationId] = useState<string | null>(null);
+  const [sendError, setSendError] = useState<string | null>(null);
   const [greeting, setGreeting] = useState("Ask Ion");
   const [projects, setProjects] = useState<Project[]>([]);
   const [artifacts, setArtifacts] = useState<Artifact[]>([]);
@@ -557,7 +560,6 @@ export function ChatView() {
   const [selectedArtifactIds, setSelectedArtifactIds] = useState<string[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const pendingReply = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const selectedProjects = projects.filter((project) =>
     selectedProjectIds.includes(project.id)
@@ -624,15 +626,7 @@ export function ChatView() {
     const container = scrollRef.current;
     if (!container) return;
     container.scrollTop = container.scrollHeight;
-  }, [messages, isThinking]);
-
-  useEffect(() => {
-    return () => {
-      if (pendingReply.current) {
-        clearTimeout(pendingReply.current);
-      }
-    };
-  }, []);
+  }, [messages, isThinking, sendError]);
 
   function adjustInputHeight() {
     const element = textareaRef.current;
@@ -645,7 +639,7 @@ export function ChatView() {
     adjustInputHeight();
   }, [input]);
 
-  function handleSend() {
+  async function handleSend() {
     const trimmed = input.trim();
     if (!trimmed || isThinking) return;
 
@@ -653,18 +647,32 @@ export function ChatView() {
     setMessages((current) => [...current, userMessage]);
     setInput("");
     setIsThinking(true);
+    setSendError(null);
 
-    const mockReply = getMockChatResponse(trimmed);
+    try {
+      const result = await sendAgentMessage({
+        message: trimmed,
+        conversationId,
+        context: {
+          currentTab: "chat",
+          currentDate: toDateKey(getTodayDate()),
+          activeProjectId: selectedProjectIds[0] ?? null,
+          activeArtifactId: selectedArtifactIds[0] ?? null,
+        },
+      });
 
-    pendingReply.current = setTimeout(() => {
-      if (mockReply) {
-        setMessages((current) => [
-          ...current,
-          createMessage("assistant", mockReply),
-        ]);
-      }
+      setConversationId(result.conversationId);
+      setMessages((current) => [
+        ...current,
+        createMessage("assistant", result.reply),
+      ]);
+    } catch (error) {
+      setSendError(
+        error instanceof Error ? error.message : "Failed to send message"
+      );
+    } finally {
       setIsThinking(false);
-    }, mockReply ? 700 : 0);
+    }
   }
 
   function handleKeyDown(event: React.KeyboardEvent<HTMLTextAreaElement>) {
@@ -722,6 +730,9 @@ export function ChatView() {
                 )
               )}
               {isThinking ? <ThinkingIndicator /> : null}
+              {sendError ? (
+                <p className="text-[13px] text-[var(--color-ember)]">{sendError}</p>
+              ) : null}
             </>
           )}
         </div>

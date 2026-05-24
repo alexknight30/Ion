@@ -10,6 +10,7 @@ interface SecretInputProps {
   label: string;
   value: string;
   onChange: (value: string) => void;
+  onBlur?: (event: React.FocusEvent<HTMLInputElement>) => void;
   placeholder?: string;
   optional?: boolean;
 }
@@ -23,6 +24,7 @@ export function SecretInput({
   label,
   value,
   onChange,
+  onBlur,
   placeholder,
   optional = false,
 }: SecretInputProps) {
@@ -42,6 +44,7 @@ export function SecretInput({
           type={visible ? "text" : "password"}
           value={value}
           onChange={(event) => onChange(event.target.value)}
+          onBlur={onBlur}
           onCopy={preventClipboard}
           onCut={preventClipboard}
           placeholder={placeholder}

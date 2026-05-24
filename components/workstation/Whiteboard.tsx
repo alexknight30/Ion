@@ -330,8 +330,7 @@ export function Whiteboard({
     );
 
     try {
-      const updated = await updateArtifact(artifact.id, { content });
-      setArtifact(updated);
+      await updateArtifact(artifact.id, { content });
     } catch {
       setError("Could not save changes.");
     }
@@ -364,8 +363,7 @@ export function Whiteboard({
     );
 
     try {
-      const updated = await updateArtifact(artifact.id, { content });
-      setArtifact(updated);
+      await updateArtifact(artifact.id, { content });
     } catch {
       setError("Could not save changes.");
     }

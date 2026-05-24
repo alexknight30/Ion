@@ -523,6 +523,7 @@ export const TextArtifactEditor = forwardRef<
     const lines = parseEditorDom(root);
     const serialized = serializeTextArtifactContent(lines);
     contentRef.current = serialized;
+    isLocalEditRef.current = true;
     onContentChange(serialized);
   }, [onContentChange]);
 
@@ -594,6 +595,13 @@ export const TextArtifactEditor = forwardRef<
     }
 
     if (content === contentRef.current && root.childElementCount > 0) {
+      return;
+    }
+
+    if (
+      root.contains(document.activeElement) &&
+      content !== contentRef.current
+    ) {
       return;
     }
 

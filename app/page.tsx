@@ -243,6 +243,7 @@ export default function Home() {
       {activeTab !== "Chat" ? (
         <AgentButton
           {...agentState}
+          currentTab={activeTab.toLowerCase()}
           placeholder={
             emailModeOnOrganize ? "Need help drafting?" : "Ask Ion"
           }
