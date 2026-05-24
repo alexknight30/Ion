@@ -33,6 +33,8 @@ export interface AgentButtonState {
 
 interface AgentButtonProps extends AgentButtonState {
   currentTab: string;
+  activeArtifactId?: string | null;
+  activeProjectId?: string | null;
   placeholder?: string;
   className?: string;
   onOpenInChat?: (conversationId: string) => void;
@@ -42,6 +44,8 @@ interface AgentButtonProps extends AgentButtonState {
 
 export function AgentButton({
   currentTab,
+  activeArtifactId = null,
+  activeProjectId = null,
   placeholder = "Ask Ion",
   className,
   open,
@@ -161,6 +165,8 @@ export function AgentButton({
         context: {
           currentTab,
           currentDate: toDateKey(getTodayDate()),
+          activeArtifactId,
+          activeProjectId,
         },
         onMeta: ({ conversationId: nextConversationId }) => {
           setConversationId(nextConversationId);

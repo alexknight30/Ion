@@ -23,13 +23,13 @@ function formatActiveArtifact(
   artifact: MADContext["available"]["activeArtifact"]
 ) {
   if (!artifact) return "none";
-  return `${artifact.title} (${artifact.kind})${
-    artifact.contentPreview
-      ? `\nPreview: ${artifact.contentPreview.slice(0, 200)}${
-          artifact.contentPreview.length > 200 ? "…" : ""
-        }`
-      : ""
-  }`;
+  const project = artifact.projectName ? ` · ${artifact.projectName}` : "";
+  const content = artifact.contentPreview
+    ? `\nContent:\n${artifact.contentPreview}${
+        artifact.contentTruncated ? "\n… (truncated)" : ""
+      }`
+    : "\nContent: (empty)";
+  return `${artifact.title} (${artifact.kind})${project}${content}`;
 }
 
 function formatPinnedProjects(
@@ -169,7 +169,7 @@ Facts the user has set explicitly. Treat these as always true.
 - Pinned projects/artifacts come from what the user attached in the chat box for this message — treat these as intentionally elevated context.
 
 **A — Available context (deterministic workstation state)**
-What tab they are on, today's date, what is open, lightweight indexes of what exists in Ion, and recent work timestamps (project/artifact/thought updates). Use timestamps to reason about activity — do not infer recency from counts alone.
+What tab they are on, today's date, what is open, lightweight indexes of what exists in Ion, and recent work timestamps (project/artifact/thought updates). When the user is on Work with an artifact open, \`Active artifact\` is what they are viewing right now — treat its content as ground truth for questions about "this artifact" or "what I'm looking at".
 
 **D — Discernable context (your job)**
 Before answering, identify:
@@ -207,7 +207,7 @@ ${formatPinnedArtifacts(manual.pinnedArtifacts)}
 Current tab: ${available.currentTab}
 Date: ${available.currentDate}
 Active project: ${formatActiveProject(available.activeProject)}
-Active artifact: ${formatActiveArtifact(available.activeArtifact)}
+Active artifact (open on Work tab right now): ${formatActiveArtifact(available.activeArtifact)}
 Recent projects: ${
     available.recentProjects.length > 0
       ? available.recentProjects

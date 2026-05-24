@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Navbar, type Tab } from "@/components/Navbar";
 import {
   AgentButton,
@@ -95,12 +95,21 @@ function OrganizeView({
   );
 }
 
-function WorkView() {
+function WorkView({
+  activeArtifactId,
+  activeNoteId,
+  onActiveArtifactChange,
+}: {
+  activeArtifactId: string | null;
+  activeNoteId: string | null;
+  onActiveArtifactChange: (
+    artifactId: string | null,
+    noteId?: string | null
+  ) => void;
+}) {
   const [openSection, setOpenSection] = useState<WorkSection | null>(
     null
   );
-  const [activeArtifactId, setActiveArtifactId] = useState<string | null>(null);
-  const [activeNoteId, setActiveNoteId] = useState<string | null>(null);
   const [whiteboardRefreshKey, setWhiteboardRefreshKey] = useState(0);
   const [projectsRefreshKey, setProjectsRefreshKey] = useState(0);
   const [artifactRecentsKey, setArtifactRecentsKey] = useState(0);
@@ -115,13 +124,11 @@ function WorkView() {
     if (artifactId !== activeArtifactId) {
       setWhiteboardRefreshKey((current) => current + 1);
     }
-    setActiveArtifactId(artifactId);
-    setActiveNoteId(noteId ?? null);
+    onActiveArtifactChange(artifactId, noteId ?? null);
   };
 
   const handleCloseArtifact = () => {
-    setActiveArtifactId(null);
-    setActiveNoteId(null);
+    onActiveArtifactChange(null, null);
   };
 
   return (
@@ -181,10 +188,6 @@ function SettingsView({ isActive }: { isActive: boolean }) {
   );
 }
 
-const views: Record<Exclude<Tab, "Organize" | "Settings" | "Chat">, ReactNode> = {
-  Work: <WorkView />,
-};
-
 const tabLayout: Record<Tab, string> = {
   Organize: "h-full min-h-0 pl-6 pr-8 md:pl-8",
   Work: "h-full min-h-0 pl-6 pr-8 md:pl-8",
@@ -208,6 +211,10 @@ export default function Home() {
   const [agentResyncConversationId, setAgentResyncConversationId] = useState<
     string | null
   >(null);
+  const [workActiveArtifactId, setWorkActiveArtifactId] = useState<string | null>(
+    null
+  );
+  const [workActiveNoteId, setWorkActiveNoteId] = useState<string | null>(null);
   const previousTabRef = useRef<Tab>("Organize");
   const wasEmailModeRef = useRef(false);
 
@@ -256,13 +263,16 @@ export default function Home() {
             onInboxExpandedChange={setInboxExpanded}
           />
         </div>
-        {(Object.keys(views) as Array<Exclude<Tab, "Organize" | "Settings" | "Chat">>).map(
-          (tab) => (
-            <div key={tab} hidden={activeTab !== tab} className={tabLayout[tab]}>
-              {views[tab]}
-            </div>
-          )
-        )}
+        <div hidden={activeTab !== "Work"} className={tabLayout.Work}>
+          <WorkView
+            activeArtifactId={workActiveArtifactId}
+            activeNoteId={workActiveNoteId}
+            onActiveArtifactChange={(artifactId, noteId) => {
+              setWorkActiveArtifactId(artifactId);
+              setWorkActiveNoteId(noteId ?? null);
+            }}
+          />
+        </div>
         <div hidden={activeTab !== "Chat"} className={tabLayout.Chat}>
           <ChatView
             openConversationId={pendingChatConversationId}
@@ -277,6 +287,9 @@ export default function Home() {
       <AgentButton
         {...agentState}
         currentTab={activeTab.toLowerCase()}
+        activeArtifactId={
+          activeTab === "Work" ? workActiveArtifactId : null
+        }
         placeholder={
           emailModeOnOrganize ? "Need help drafting?" : "Ask Ion"
         }

@@ -1,7 +1,11 @@
 import { db } from "@/lib/db";
-import { THOUGHTS_JOURNAL_KIND } from "@/lib/artifact-constants";
+import {
+  SKETCH_ARTIFACT_KIND,
+  THOUGHTS_JOURNAL_KIND,
+} from "@/lib/artifact-constants";
 
 const RECENT_WORK_ACTIVITY_LIMIT = 20;
+const ACTIVE_ARTIFACT_CONTENT_LIMIT = 12_000;
 
 function noteActivityTitle(content: string) {
   const firstLine = content.split("\n").find((line) => line.trim().length > 0);
@@ -60,6 +64,44 @@ function buildRecentWorkActivity(
     .slice(0, RECENT_WORK_ACTIVITY_LIMIT);
 }
 
+function truncateArtifactContent(content: string) {
+  if (content.length <= ACTIVE_ARTIFACT_CONTENT_LIMIT) {
+    return { text: content, truncated: false };
+  }
+
+  return {
+    text: `${content.slice(0, ACTIVE_ARTIFACT_CONTENT_LIMIT)}…`,
+    truncated: true,
+  };
+}
+
+function buildActiveArtifactContent(artifact: {
+  kind: string;
+  content: string | null;
+  notes: Array<{ content: string }>;
+}) {
+  if (artifact.kind === THOUGHTS_JOURNAL_KIND) {
+    const journal = artifact.notes
+      .map((note) => note.content.trim())
+      .filter(Boolean)
+      .join("\n\n---\n\n");
+    return truncateArtifactContent(journal);
+  }
+
+  if (artifact.kind === SKETCH_ARTIFACT_KIND) {
+    const raw = artifact.content?.trim();
+    if (!raw) {
+      return { text: "(empty sketch)", truncated: false };
+    }
+
+    return truncateArtifactContent(
+      `[Sketch whiteboard data]\n${raw}`
+    );
+  }
+
+  return truncateArtifactContent(artifact.content?.trim() ?? "");
+}
+
 export type ManualContext = {
   profile: {
     name: string;
@@ -93,7 +135,9 @@ export type AvailableContext = {
     id: string;
     title: string;
     kind: string;
+    projectName?: string;
     contentPreview: string;
+    contentTruncated: boolean;
   } | null;
   recentProjects: {
     id: string;
@@ -164,7 +208,20 @@ export async function assembleContext(params: {
     activeArtifactId
       ? db.artifact.findUnique({
           where: { id: activeArtifactId },
-          include: { project: { select: { name: true } } },
+          include: {
+            project: {
+              select: {
+                id: true,
+                name: true,
+                description: true,
+                workType: true,
+              },
+            },
+            notes: {
+              orderBy: { createdAt: "asc" },
+              select: { content: true },
+            },
+          },
         })
       : Promise.resolve(null),
     pinnedProjectIds.length
@@ -243,6 +300,28 @@ export async function assembleContext(params: {
     recentNotes
   );
 
+  const resolvedActiveProject =
+    (activeProject
+      ? {
+          id: activeProject.id,
+          name: activeProject.name,
+          description: activeProject.description ?? undefined,
+          workType: activeProject.workType ?? undefined,
+        }
+      : null) ??
+    (activeArtifact?.project
+      ? {
+          id: activeArtifact.project.id,
+          name: activeArtifact.project.name,
+          description: activeArtifact.project.description ?? undefined,
+          workType: activeArtifact.project.workType ?? undefined,
+        }
+      : null);
+
+  const activeArtifactContent = activeArtifact
+    ? buildActiveArtifactContent(activeArtifact)
+    : null;
+
   return {
     manual: {
       profile: {
@@ -268,20 +347,15 @@ export async function assembleContext(params: {
     available: {
       currentTab: params.currentTab,
       currentDate: params.currentDate,
-      activeProject: activeProject
-        ? {
-            id: activeProject.id,
-            name: activeProject.name,
-            description: activeProject.description ?? undefined,
-            workType: activeProject.workType ?? undefined,
-          }
-        : null,
+      activeProject: resolvedActiveProject,
       activeArtifact: activeArtifact
         ? {
             id: activeArtifact.id,
             title: activeArtifact.title,
             kind: activeArtifact.kind,
-            contentPreview: (activeArtifact.content ?? "").slice(0, 500),
+            projectName: activeArtifact.project?.name,
+            contentPreview: activeArtifactContent?.text ?? "",
+            contentTruncated: activeArtifactContent?.truncated ?? false,
           }
         : null,
       recentProjects,
