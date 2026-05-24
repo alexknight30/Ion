@@ -6,6 +6,8 @@ export type ConversationHistoryMessage = {
 };
 
 export const CONVERSATION_HISTORY_LIMIT = 10;
+export const ION_TITLE_PATTERN =
+  /^\[ION_TITLE\]([\s\S]*?)\[\/ION_TITLE\]\n?\n?/;
 
 function formatActiveProject(
   project: MADContext["available"]["activeProject"]
@@ -28,6 +30,36 @@ function formatActiveArtifact(
         }`
       : ""
   }`;
+}
+
+function formatPinnedProjects(
+  projects: MADContext["manual"]["pinnedProjects"]
+) {
+  if (projects.length === 0) return "none";
+  return projects
+    .map((project) => {
+      const parts = [project.name];
+      if (project.workType) parts.push(`(${project.workType})`);
+      if (project.description) parts.push(`— ${project.description}`);
+      return `- ${parts.join(" ")}`;
+    })
+    .join("\n");
+}
+
+function formatPinnedArtifacts(
+  artifacts: MADContext["manual"]["pinnedArtifacts"]
+) {
+  if (artifacts.length === 0) return "none";
+  return artifacts
+    .map((artifact) => {
+      const preview = artifact.contentPreview
+        ? `\n  Preview: ${artifact.contentPreview.slice(0, 150)}${
+            artifact.contentPreview.length > 150 ? "…" : ""
+          }`
+        : "";
+      return `- ${artifact.title} (${artifact.kind})${preview}`;
+    })
+    .join("\n");
 }
 
 function formatTodos(todos: MADContext["available"]["todosToday"]) {
@@ -76,9 +108,21 @@ ${history
   .join("\n\n")}`;
 }
 
+function formatFirstMessageDuty(isFirstMessage: boolean) {
+  if (!isFirstMessage) return "";
+
+  return `
+
+## First message duty
+This is the first message in a new conversation. Begin your reply with exactly one line in this format:
+[ION_TITLE]Short descriptive title[/ION_TITLE]
+Then leave a blank line, then write your actual reply. The title should be 3-6 words summarizing the user's intent. Do not mention the title format in your reply.`;
+}
+
 export function buildSystemPrompt(
   ctx: MADContext,
-  conversationHistory?: ConversationHistoryMessage[]
+  conversationHistory?: ConversationHistoryMessage[],
+  options?: { isFirstMessage?: boolean }
 ): string {
   const { manual, available } = ctx;
   const userLine = [manual.profile.name, manual.profile.occupation]
@@ -96,6 +140,8 @@ Every turn you receive structured context in three layers:
 
 **M — Manual context (privileged, user-defined ground truth)**
 Facts the user has set explicitly. Treat these as always true.
+- Profile basics come from Settings (name, role, company).
+- Pinned projects/artifacts come from what the user attached in the chat box for this message — treat these as intentionally elevated context.
 
 **A — Available context (deterministic workstation state)**
 What tab they are on, today's date, what is open, and lightweight indexes of what exists in Ion right now. Use this to narrow what is relevant.
@@ -105,16 +151,22 @@ Before answering, identify:
 1. Which specific items from A (projects, artifacts, todos) are relevant to the user's message
 2. The time scale (today, this week, a specific project, all-time)
 
-You do not have tools yet — reason only from M and A. When helpful, briefly state what you are focusing on (e.g. "Based on your active project X and today's todos…"). Do not invent items that are not listed in A.
+You do not have tools yet — reason only from M and A. When helpful, briefly state what you are focusing on (e.g. "Based on your pinned Ion project and today's todos…"). Do not invent items that are not listed in M or A.
 
 ## Tone and behavior
 
 - Concise, direct, and personal. Address the user by name when natural.
 - Not sycophantic. No filler praise.
-- If you lack enough context to answer confidently, ask one specific clarifying question instead of guessing.
+- If you lack enough context to answer confidently, ask one specific clarifying question instead of guessing.${formatFirstMessageDuty(options?.isFirstMessage ?? false)}
 
 --- MANUAL CONTEXT (M) ---
-User: ${userLine || "Unknown user"}${companyLine}
+User profile: ${userLine || "Unknown user"}${companyLine}
+
+Pinned projects (attached in chat):
+${formatPinnedProjects(manual.pinnedProjects)}
+
+Pinned artifacts (attached in chat):
+${formatPinnedArtifacts(manual.pinnedArtifacts)}
 
 --- AVAILABLE CONTEXT (A) ---
 Current tab: ${available.currentTab}
@@ -137,4 +189,52 @@ export function getRecentConversationHistory<
   T extends ConversationHistoryMessage,
 >(messages: T[], limit = CONVERSATION_HISTORY_LIMIT) {
   return messages.slice(-limit);
+}
+
+export function extractConversationTitle(reply: string) {
+  const match = reply.match(ION_TITLE_PATTERN);
+  if (!match) {
+    return { title: null as string | null, content: reply.trim() };
+  }
+
+  const title = match[1].trim().slice(0, 80);
+  const content = reply.slice(match[0].length).trim();
+
+  return {
+    title: title.length > 0 ? title : null,
+    content: content.length > 0 ? content : reply.trim(),
+  };
+}
+
+export function createTitleStreamFilter() {
+  let buffer = "";
+  let pastTitle = false;
+
+  return (delta: string) => {
+    if (pastTitle) return delta;
+
+    buffer += delta;
+
+    const match = buffer.match(ION_TITLE_PATTERN);
+    if (match) {
+      pastTitle = true;
+      const remainder = buffer.slice(match[0].length);
+      buffer = "";
+      return remainder;
+    }
+
+    if (buffer.length > 120 && !buffer.startsWith("[ION_TITLE]")) {
+      pastTitle = true;
+      const remainder = buffer;
+      buffer = "";
+      return remainder;
+    }
+
+    return "";
+  };
+}
+
+export function peekConversationTitle(reply: string) {
+  const match = reply.match(ION_TITLE_PATTERN);
+  return match?.[1]?.trim().slice(0, 80) ?? null;
 }

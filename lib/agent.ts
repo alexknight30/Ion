@@ -3,6 +3,8 @@ export type AgentContextParams = {
   currentDate: string;
   activeProjectId?: string | null;
   activeArtifactId?: string | null;
+  pinnedProjectIds?: string[];
+  pinnedArtifactIds?: string[];
 };
 
 export type StreamAgentMessageInput = {
@@ -14,6 +16,7 @@ export type StreamAgentMessageInput = {
   onDone?: (data: {
     conversationId: string;
     reply: string;
+    title?: string | null;
     inputTokens?: number;
     outputTokens?: number;
   }) => void;
@@ -110,6 +113,12 @@ export async function streamAgentMessage(
         input.onDone?.({
           conversationId,
           reply,
+          title:
+            typeof parsed.data.title === "string"
+              ? parsed.data.title
+              : parsed.data.title === null
+                ? null
+                : undefined,
           inputTokens:
             typeof parsed.data.inputTokens === "number"
               ? parsed.data.inputTokens

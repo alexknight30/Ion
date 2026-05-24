@@ -11,6 +11,7 @@ import {
   type TokenUsageStats,
 } from "@/lib/usage";
 import { SettingsSection } from "./SettingsSection";
+import { UsageProjectionChart } from "./UsageProjectionChart";
 
 const USAGE_FIELDS = [
   {
@@ -102,16 +103,19 @@ export function UsagePanel() {
       {loading ? (
         <p className="text-[13px] text-[var(--color-pumice)]">Loading…</p>
       ) : (
-        <div className="grid gap-5 md:grid-cols-2">
-          {USAGE_FIELDS.map(({ id, label, format }) => (
-            <ReadOnlyField
-              key={id}
-              id={id}
-              label={label}
-              value={format(stats)}
-            />
-          ))}
-        </div>
+        <>
+          <div className="grid gap-5 md:grid-cols-2">
+            {USAGE_FIELDS.map(({ id, label, format }) => (
+              <ReadOnlyField
+                key={id}
+                id={id}
+                label={label}
+                value={format(stats)}
+              />
+            ))}
+          </div>
+          <UsageProjectionChart stats={stats} />
+        </>
       )}
     </SettingsSection>
   );

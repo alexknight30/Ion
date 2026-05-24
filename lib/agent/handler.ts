@@ -2,6 +2,8 @@ import { db } from "@/lib/db";
 import { assembleContext } from "@/lib/context";
 import {
   buildSystemPrompt,
+  createTitleStreamFilter,
+  extractConversationTitle,
   getRecentConversationHistory,
   type ConversationHistoryMessage,
 } from "@/lib/agent/system-prompt";
@@ -19,6 +21,8 @@ export type AgentRequestBody = {
     currentDate?: unknown;
     activeProjectId?: unknown;
     activeArtifactId?: unknown;
+    pinnedProjectIds?: unknown;
+    pinnedArtifactIds?: unknown;
   };
 };
 
@@ -29,13 +33,15 @@ export type ParsedAgentRequest = {
   currentDate: string;
   activeProjectId?: string | null;
   activeArtifactId?: string | null;
+  pinnedProjectIds: string[];
+  pinnedArtifactIds: string[];
 };
 
-export type AgentRunResult = {
-  conversationId: string;
-  reply: string;
-  inputTokens: number;
-  outputTokens: number;
+type AnthropicStreamEvent = {
+  type?: string;
+  delta?: { type?: string; text?: string };
+  message?: { usage?: { input_tokens?: number; output_tokens?: number } };
+  usage?: { input_tokens?: number; output_tokens?: number };
 };
 
 export function optionalId(value: unknown): string | null | undefined {
@@ -47,18 +53,17 @@ export function optionalId(value: unknown): string | null | undefined {
   return value.trim();
 }
 
-function deriveConversationTitle(message: string) {
-  const trimmed = message.trim().replace(/\s+/g, " ");
-  if (!trimmed) return "New conversation";
-  return trimmed.length > 80 ? `${trimmed.slice(0, 77)}…` : trimmed;
-}
+export function parseIdArray(value: unknown): string[] | undefined {
+  if (value === undefined) return undefined;
+  if (!Array.isArray(value)) return undefined;
 
-type AnthropicStreamEvent = {
-  type?: string;
-  delta?: { type?: string; text?: string };
-  message?: { usage?: { input_tokens?: number; output_tokens?: number } };
-  usage?: { input_tokens?: number; output_tokens?: number };
-};
+  const ids = value
+    .filter((entry): entry is string => typeof entry === "string")
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+
+  return [...new Set(ids)];
+}
 
 export async function prepareAgentRun(body: ParsedAgentRequest) {
   const config = await db.agentConfig.upsert({
@@ -71,11 +76,18 @@ export async function prepareAgentRun(body: ParsedAgentRequest) {
     throw new Error("No API key configured — add one in Settings.");
   }
 
+  const activeProjectId =
+    body.activeProjectId ?? body.pinnedProjectIds[0] ?? null;
+  const activeArtifactId =
+    body.activeArtifactId ?? body.pinnedArtifactIds[0] ?? null;
+
   const madContext = await assembleContext({
     currentTab: body.currentTab.toLowerCase(),
     currentDate: body.currentDate,
-    activeProjectId: body.activeProjectId,
-    activeArtifactId: body.activeArtifactId,
+    activeProjectId,
+    activeArtifactId,
+    pinnedProjectIds: body.pinnedProjectIds,
+    pinnedArtifactIds: body.pinnedArtifactIds,
   });
 
   let conversation = body.conversationId
@@ -107,8 +119,11 @@ export async function prepareAgentRun(body: ParsedAgentRequest) {
     })
   );
 
+  const isFirstMessage = priorMessages.length === 0;
   const conversationHistory = getRecentConversationHistory(priorMessages);
-  const systemPrompt = buildSystemPrompt(madContext, conversationHistory);
+  const systemPrompt = buildSystemPrompt(madContext, conversationHistory, {
+    isFirstMessage,
+  });
 
   await db.message.create({
     data: {
@@ -118,18 +133,13 @@ export async function prepareAgentRun(body: ParsedAgentRequest) {
     },
   });
 
-  if (!conversation.title) {
-    await db.conversation.update({
-      where: { id: conversation.id },
-      data: { title: deriveConversationTitle(body.message) },
-    });
-  }
-
   return {
     config,
     madContext,
     conversationId: conversation.id,
     systemPrompt,
+    isFirstMessage,
+    needsTitle: isFirstMessage && !conversation.title,
   };
 }
 
@@ -138,6 +148,7 @@ export async function streamAnthropicReply(params: {
   model: string;
   systemPrompt: string;
   message: string;
+  stripTitle?: boolean;
   onDelta: (text: string) => void;
 }) {
   const response = await fetch("https://api.anthropic.com/v1/messages", {
@@ -175,6 +186,7 @@ export async function streamAnthropicReply(params: {
   let reply = "";
   let inputTokens = 0;
   let outputTokens = 0;
+  const filterTitle = params.stripTitle ? createTitleStreamFilter() : null;
 
   while (true) {
     const { done, value } = await reader.read();
@@ -212,7 +224,12 @@ export async function streamAnthropicReply(params: {
         parsed.delta.text
       ) {
         reply += parsed.delta.text;
-        params.onDelta(parsed.delta.text);
+        const visibleText = filterTitle
+          ? filterTitle(parsed.delta.text)
+          : parsed.delta.text;
+        if (visibleText) {
+          params.onDelta(visibleText);
+        }
       }
 
       if (eventName === "message_start" && parsed.message?.usage) {
@@ -231,13 +248,23 @@ export async function streamAnthropicReply(params: {
     throw new Error("Empty response from Anthropic API");
   }
 
-  return { reply, inputTokens, outputTokens };
+  const parsedReply = params.stripTitle
+    ? extractConversationTitle(reply)
+    : { title: null, content: reply };
+
+  return {
+    reply: parsedReply.content,
+    title: parsedReply.title,
+    inputTokens,
+    outputTokens,
+  };
 }
 
 export async function finalizeAgentRun(params: {
   conversationId: string;
   madContext: Awaited<ReturnType<typeof assembleContext>>;
   reply: string;
+  title?: string | null;
   model: string;
   currentDate: string;
   inputTokens: number;
@@ -254,7 +281,10 @@ export async function finalizeAgentRun(params: {
 
   await db.conversation.update({
     where: { id: params.conversationId },
-    data: { updatedAt: new Date() },
+    data: {
+      updatedAt: new Date(),
+      ...(params.title ? { title: params.title } : {}),
+    },
   });
 
   const priceUsd = estimateTokenPriceUsd(
@@ -274,6 +304,7 @@ export async function finalizeAgentRun(params: {
   return {
     conversationId: params.conversationId,
     reply: params.reply,
+    title: params.title ?? null,
     inputTokens: params.inputTokens,
     outputTokens: params.outputTokens,
     priceUsd,

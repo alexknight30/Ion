@@ -37,6 +37,15 @@ export function formatTokenCount(value: number) {
 }
 
 export function formatUsd(value: number) {
+  if (value > 0 && value < 0.01) {
+    return value.toLocaleString(undefined, {
+      style: "currency",
+      currency: "USD",
+      minimumFractionDigits: 3,
+      maximumFractionDigits: 4,
+    });
+  }
+
   return value.toLocaleString(undefined, {
     style: "currency",
     currency: "USD",

@@ -8,6 +8,7 @@ import {
   encodeSse,
   finalizeAgentRun,
   optionalId,
+  parseIdArray,
   prepareAgentRun,
   streamAnthropicReply,
   type AgentRequestBody,
@@ -34,6 +35,8 @@ function parseAgentRequest(body: AgentRequestBody): ParsedAgentRequest | Respons
 
   const activeProjectId = optionalId(body.context.activeProjectId);
   const activeArtifactId = optionalId(body.context.activeArtifactId);
+  const pinnedProjectIds = parseIdArray(body.context.pinnedProjectIds) ?? [];
+  const pinnedArtifactIds = parseIdArray(body.context.pinnedArtifactIds) ?? [];
 
   if (
     body.context.activeProjectId !== undefined &&
@@ -51,6 +54,20 @@ function parseAgentRequest(body: AgentRequestBody): ParsedAgentRequest | Respons
     return badRequest('"context.activeArtifactId" must be a string or null');
   }
 
+  if (
+    body.context.pinnedProjectIds !== undefined &&
+    parseIdArray(body.context.pinnedProjectIds) === undefined
+  ) {
+    return badRequest('"context.pinnedProjectIds" must be an array of strings');
+  }
+
+  if (
+    body.context.pinnedArtifactIds !== undefined &&
+    parseIdArray(body.context.pinnedArtifactIds) === undefined
+  ) {
+    return badRequest('"context.pinnedArtifactIds" must be an array of strings');
+  }
+
   let conversationId: string | undefined;
   if (body.conversationId !== undefined) {
     if (typeof body.conversationId !== "string" || !body.conversationId.trim()) {
@@ -66,6 +83,8 @@ function parseAgentRequest(body: AgentRequestBody): ParsedAgentRequest | Respons
     currentDate: body.context.currentDate,
     activeProjectId,
     activeArtifactId,
+    pinnedProjectIds,
+    pinnedArtifactIds,
   };
 }
 
@@ -89,20 +108,23 @@ export async function POST(request: Request) {
 
         send("meta", { conversationId: prepared.conversationId });
 
-        const { reply, inputTokens, outputTokens } = await streamAnthropicReply({
-          apiKey: prepared.config.apiKey!,
-          model: prepared.config.model,
-          systemPrompt: prepared.systemPrompt,
-          message: parsed.message,
-          onDelta: (text) => {
-            send("delta", { text });
-          },
-        });
+        const { reply, title, inputTokens, outputTokens } =
+          await streamAnthropicReply({
+            apiKey: prepared.config.apiKey!,
+            model: prepared.config.model,
+            systemPrompt: prepared.systemPrompt,
+            message: parsed.message,
+            stripTitle: prepared.needsTitle,
+            onDelta: (text) => {
+              send("delta", { text });
+            },
+          });
 
         const result = await finalizeAgentRun({
           conversationId: prepared.conversationId,
           madContext: prepared.madContext,
           reply,
+          title: prepared.needsTitle ? title : null,
           model: prepared.config.model,
           currentDate: parsed.currentDate,
           inputTokens,
@@ -112,6 +134,7 @@ export async function POST(request: Request) {
         send("done", {
           conversationId: result.conversationId,
           reply: result.reply,
+          title: result.title,
           inputTokens: result.inputTokens,
           outputTokens: result.outputTokens,
         });

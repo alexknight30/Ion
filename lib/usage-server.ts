@@ -34,15 +34,23 @@ export async function getUsageStats(): Promise<TokenUsageStats> {
       acc.inputTokens += log.inputTokens;
       acc.outputTokens += log.outputTokens;
       acc.priceUsd += log.priceUsd;
+      acc.activeDays.add(log.date);
       return acc;
     },
-    { inputTokens: 0, outputTokens: 0, priceUsd: 0 }
+    {
+      inputTokens: 0,
+      outputTokens: 0,
+      priceUsd: 0,
+      activeDays: new Set<string>(),
+    }
   );
 
+  const daysWithActivity = Math.max(totals.activeDays.size, 1);
+
   return buildUsageStats({
-    inputTokens: totals.inputTokens / LOOKBACK_DAYS,
-    outputTokens: totals.outputTokens / LOOKBACK_DAYS,
-    priceUsd: totals.priceUsd / LOOKBACK_DAYS,
+    inputTokens: totals.inputTokens / daysWithActivity,
+    outputTokens: totals.outputTokens / daysWithActivity,
+    priceUsd: totals.priceUsd / daysWithActivity,
   });
 }
 

@@ -6,6 +6,18 @@ export type ManualContext = {
     occupation: string;
     company: string;
   };
+  pinnedProjects: {
+    id: string;
+    name: string;
+    description?: string;
+    workType?: string;
+  }[];
+  pinnedArtifacts: {
+    id: string;
+    title: string;
+    kind: string;
+    contentPreview?: string;
+  }[];
 };
 
 export type AvailableContext = {
@@ -53,14 +65,20 @@ export async function assembleContext(params: {
   currentDate: string;
   activeProjectId?: string | null;
   activeArtifactId?: string | null;
+  pinnedProjectIds?: string[];
+  pinnedArtifactIds?: string[];
 }): Promise<MADContext> {
   const activeProjectId = params.activeProjectId ?? null;
   const activeArtifactId = params.activeArtifactId ?? null;
+  const pinnedProjectIds = [...new Set(params.pinnedProjectIds ?? [])];
+  const pinnedArtifactIds = [...new Set(params.pinnedArtifactIds ?? [])];
 
   const [
     profile,
     activeProject,
     activeArtifact,
+    pinnedProjects,
+    pinnedArtifacts,
     todosToday,
     projects,
     artifacts,
@@ -79,6 +97,28 @@ export async function assembleContext(params: {
           include: { project: { select: { name: true } } },
         })
       : Promise.resolve(null),
+    pinnedProjectIds.length
+      ? db.project.findMany({
+          where: { id: { in: pinnedProjectIds } },
+          select: {
+            id: true,
+            name: true,
+            description: true,
+            workType: true,
+          },
+        })
+      : Promise.resolve([]),
+    pinnedArtifactIds.length
+      ? db.artifact.findMany({
+          where: { id: { in: pinnedArtifactIds } },
+          select: {
+            id: true,
+            title: true,
+            kind: true,
+            content: true,
+          },
+        })
+      : Promise.resolve([]),
     db.todo.findMany({
       where: { date: params.currentDate },
       orderBy: [{ completed: "asc" }, { position: "asc" }, { createdAt: "asc" }],
@@ -117,6 +157,20 @@ export async function assembleContext(params: {
         occupation: profile.occupation,
         company: profile.company,
       },
+      pinnedProjects: pinnedProjects.map((project) => ({
+        id: project.id,
+        name: project.name,
+        description: project.description ?? undefined,
+        workType: project.workType ?? undefined,
+      })),
+      pinnedArtifacts: pinnedArtifacts.map((artifact) => ({
+        id: artifact.id,
+        title: artifact.title,
+        kind: artifact.kind,
+        contentPreview: artifact.content
+          ? artifact.content.slice(0, 300)
+          : undefined,
+      })),
     },
     available: {
       currentTab: params.currentTab,

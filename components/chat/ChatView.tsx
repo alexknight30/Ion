@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import Image from "next/image";
 import { SmartTextarea } from "@/components/ui/SmartTextarea";
+import { FormattedText } from "@/components/ui/FormattedText";
 import { cn } from "@/lib/cn";
 import { getRandomChatGreeting } from "@/lib/chat-greetings";
 import { streamAgentMessage } from "@/lib/agent";
@@ -80,25 +81,10 @@ function AssistantMessage({
   content: string;
   streaming?: boolean;
 }) {
-  if (streaming) {
-    return (
-      <div className="flex justify-start">
-        <div className="max-w-[95%] whitespace-pre-wrap text-[15px] leading-[1.6] tracking-[-0.01em] text-[var(--color-bone)]">
-          {content}
-          <span className="ml-0.5 inline-block h-[1em] w-[2px] translate-y-[2px] animate-pulse bg-[var(--color-pumice)]" />
-        </div>
-      </div>
-    );
-  }
-
-  const paragraphs = content.split(/\n+/).filter(Boolean);
-
   return (
     <div className="flex justify-start">
-      <div className="max-w-[95%] space-y-3 text-[15px] leading-[1.6] tracking-[-0.01em] text-[var(--color-bone)]">
-        {paragraphs.map((paragraph, index) => (
-          <p key={index}>{paragraph}</p>
-        ))}
+      <div className="max-w-[95%] text-[15px] leading-[1.6] tracking-[-0.01em] text-[var(--color-bone)]">
+        <FormattedText content={content} streaming={streaming} />
       </div>
     </div>
   );
@@ -760,6 +746,8 @@ export function ChatView() {
           currentDate: toDateKey(getTodayDate()),
           activeProjectId: selectedProjectIds[0] ?? null,
           activeArtifactId: selectedArtifactIds[0] ?? null,
+          pinnedProjectIds: selectedProjectIds,
+          pinnedArtifactIds: selectedArtifactIds,
         },
         onMeta: ({ conversationId: nextConversationId }) => {
           setConversationId(nextConversationId);

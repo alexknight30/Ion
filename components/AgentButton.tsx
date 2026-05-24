@@ -5,6 +5,7 @@ import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/cn";
 import { SmartInput } from "@/components/ui/SmartTextarea";
+import { FormattedText } from "@/components/ui/FormattedText";
 import { streamAgentMessage } from "@/lib/agent";
 import { getTodayDate, toDateKey } from "@/lib/calendar";
 
@@ -244,12 +245,11 @@ export function AgentButton({
             <p className="text-[13px] text-[var(--color-ember)]">{error}</p>
           ) : null}
           {reply ? (
-            <p className="whitespace-pre-wrap text-[14px] leading-relaxed tracking-[-0.01em] text-[var(--color-bone)]">
-              {reply}
-              {isThinking ? (
-                <span className="ml-0.5 inline-block h-[1em] w-[2px] translate-y-[2px] animate-pulse bg-[var(--color-pumice)]" />
-              ) : null}
-            </p>
+            <FormattedText
+              content={reply}
+              streaming={isThinking}
+              className="text-[14px] leading-relaxed tracking-[-0.01em] text-[var(--color-bone)]"
+            />
           ) : null}
         </div>
       ) : null}
