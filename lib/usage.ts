@@ -44,3 +44,11 @@ export function formatUsd(value: number) {
     maximumFractionDigits: 2,
   });
 }
+
+export async function fetchUsageStats(): Promise<TokenUsageStats> {
+  const response = await fetch("/api/usage");
+  if (!response.ok) {
+    throw new Error("Failed to load usage stats");
+  }
+  return response.json();
+}

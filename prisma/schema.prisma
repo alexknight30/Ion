@@ -82,6 +82,7 @@ model AgentConfig {
 
 model Conversation {
   id        String    @id @default(cuid())
+  title     String?
   messages  Message[]
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -97,4 +98,16 @@ model Message {
   createdAt       DateTime     @default(now())
 
   @@index([conversationId])
+}
+
+model TokenUsageLog {
+  id           String   @id @default(cuid())
+  date         String
+  inputTokens  Int
+  outputTokens Int
+  priceUsd     Float
+  model        String
+  createdAt    DateTime @default(now())
+
+  @@index([date])
 }

@@ -1,5 +1,12 @@
 import type { MADContext } from "@/lib/context";
 
+export type ConversationHistoryMessage = {
+  role: "user" | "assistant";
+  content: string;
+};
+
+export const CONVERSATION_HISTORY_LIMIT = 10;
+
 function formatActiveProject(
   project: MADContext["available"]["activeProject"]
 ) {
@@ -51,7 +58,28 @@ function formatArtifacts(
     .join("\n");
 }
 
-export function buildSystemPrompt(ctx: MADContext): string {
+function formatConversationHistory(
+  history: ConversationHistoryMessage[] | undefined
+) {
+  if (!history?.length) return "";
+
+  return `
+
+--- CONVERSATION HISTORY (last ${history.length} messages) ---
+Use this to continue naturally if the user is picking up an earlier thread.
+
+${history
+  .map((entry) => {
+    const label = entry.role === "user" ? "User" : "Assistant";
+    return `${label}: ${entry.content}`;
+  })
+  .join("\n\n")}`;
+}
+
+export function buildSystemPrompt(
+  ctx: MADContext,
+  conversationHistory?: ConversationHistoryMessage[]
+): string {
   const { manual, available } = ctx;
   const userLine = [manual.profile.name, manual.profile.occupation]
     .filter(Boolean)
@@ -102,5 +130,11 @@ Today's todos:
 ${formatTodos(available.todosToday)}
 All projects: ${formatProjects(available.allProjectNames)}
 All artifacts:
-${formatArtifacts(available.allArtifactTitles)}`;
+${formatArtifacts(available.allArtifactTitles)}${formatConversationHistory(conversationHistory)}`;
+}
+
+export function getRecentConversationHistory<
+  T extends ConversationHistoryMessage,
+>(messages: T[], limit = CONVERSATION_HISTORY_LIMIT) {
+  return messages.slice(-limit);
 }

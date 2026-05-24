@@ -13,8 +13,13 @@ import Image from "next/image";
 import { SmartTextarea } from "@/components/ui/SmartTextarea";
 import { cn } from "@/lib/cn";
 import { getRandomChatGreeting } from "@/lib/chat-greetings";
-import { sendAgentMessage } from "@/lib/agent";
+import { streamAgentMessage } from "@/lib/agent";
 import { getTodayDate, toDateKey } from "@/lib/calendar";
+import {
+  fetchConversation,
+  fetchConversations,
+  type ConversationSummary,
+} from "@/lib/conversations";
 import { fetchProfile, getFirstName } from "@/lib/profile";
 import { fetchProjects, type Project } from "@/lib/projects";
 import { fetchArtifacts, type Artifact } from "@/lib/artifacts";
@@ -23,6 +28,7 @@ import {
   getArtifactDisplayTitle,
   getArtifactTypeLabel,
 } from "@/lib/artifact-constants";
+import { ConversationSidebar } from "./ConversationSidebar";
 
 interface Message {
   id: string;
@@ -67,7 +73,24 @@ function UserMessage({ content }: { content: string }) {
   );
 }
 
-function AssistantMessage({ content }: { content: string }) {
+function AssistantMessage({
+  content,
+  streaming = false,
+}: {
+  content: string;
+  streaming?: boolean;
+}) {
+  if (streaming) {
+    return (
+      <div className="flex justify-start">
+        <div className="max-w-[95%] whitespace-pre-wrap text-[15px] leading-[1.6] tracking-[-0.01em] text-[var(--color-bone)]">
+          {content}
+          <span className="ml-0.5 inline-block h-[1em] w-[2px] translate-y-[2px] animate-pulse bg-[var(--color-pumice)]" />
+        </div>
+      </div>
+    );
+  }
+
   const paragraphs = content.split(/\n+/).filter(Boolean);
 
   return (
@@ -81,15 +104,14 @@ function AssistantMessage({ content }: { content: string }) {
   );
 }
 
-function ThinkingIndicator() {
-  return (
-    <div className="flex justify-start">
-      <div className="flex items-center gap-1 py-1 text-[14px] text-[var(--color-pumice)]">
-        <span className="animate-pulse">Thinking</span>
-        <span className="inline-flex w-4 animate-pulse">…</span>
-      </div>
-    </div>
-  );
+function mapDbMessages(
+  messages: Array<{ id: string; role: string; content: string }>
+): Message[] {
+  return messages.map((message) => ({
+    id: message.id,
+    role: message.role as Message["role"],
+    content: message.content,
+  }));
 }
 
 function ProjectColorDot({ color }: { color: string | null }) {
@@ -548,8 +570,16 @@ function ChatComposer({
 export function ChatView() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
-  const [isThinking, setIsThinking] = useState(false);
+  const [isStreaming, setIsStreaming] = useState(false);
+  const [streamingMessageId, setStreamingMessageId] = useState<string | null>(
+    null
+  );
   const [conversationId, setConversationId] = useState<string | null>(null);
+  const [conversations, setConversations] = useState<ConversationSummary[]>([]);
+  const [conversationsLoading, setConversationsLoading] = useState(true);
+  const [loadingConversationId, setLoadingConversationId] = useState<
+    string | null
+  >(null);
   const [sendError, setSendError] = useState<string | null>(null);
   const [greeting, setGreeting] = useState("Ask Ion");
   const [projects, setProjects] = useState<Project[]>([]);
@@ -560,6 +590,8 @@ export function ChatView() {
   const [selectedArtifactIds, setSelectedArtifactIds] = useState<string[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const streamBufferRef = useRef<{ id: string; content: string } | null>(null);
+  const streamRafRef = useRef<number | null>(null);
 
   const selectedProjects = projects.filter((project) =>
     selectedProjectIds.includes(project.id)
@@ -568,7 +600,74 @@ export function ChatView() {
     selectedArtifactIds.includes(artifact.id)
   );
 
-  const canSend = input.trim().length > 0 && !isThinking;
+  const canSend = input.trim().length > 0 && !isStreaming && !loadingConversationId;
+
+  const refreshConversations = async () => {
+    try {
+      const data = await fetchConversations();
+      setConversations(data);
+    } catch {
+      setConversations([]);
+    } finally {
+      setConversationsLoading(false);
+    }
+  };
+
+  const flushStreamBuffer = () => {
+    if (streamRafRef.current !== null) {
+      cancelAnimationFrame(streamRafRef.current);
+      streamRafRef.current = null;
+    }
+
+    const snapshot = streamBufferRef.current;
+    streamBufferRef.current = null;
+
+    if (!snapshot) return;
+
+    setMessages((current) =>
+      current.map((message) =>
+        message.id === snapshot.id
+          ? { ...message, content: snapshot.content }
+          : message
+      )
+    );
+  };
+
+  const appendStreamDelta = (messageId: string, delta: string) => {
+    if (!streamBufferRef.current || streamBufferRef.current.id !== messageId) {
+      streamBufferRef.current = { id: messageId, content: delta };
+    } else {
+      streamBufferRef.current.content += delta;
+    }
+
+    if (streamRafRef.current !== null) return;
+
+    streamRafRef.current = requestAnimationFrame(() => {
+      streamRafRef.current = null;
+      const snapshot = streamBufferRef.current;
+      if (!snapshot) return;
+
+      setMessages((current) =>
+        current.map((message) =>
+          message.id === snapshot.id
+            ? { ...message, content: snapshot.content }
+            : message
+        )
+      );
+    });
+  };
+
+  useEffect(() => {
+    void refreshConversations();
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (streamRafRef.current !== null) {
+        cancelAnimationFrame(streamRafRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -626,7 +725,7 @@ export function ChatView() {
     const container = scrollRef.current;
     if (!container) return;
     container.scrollTop = container.scrollHeight;
-  }, [messages, isThinking, sendError]);
+  }, [messages, isStreaming, sendError]);
 
   function adjustInputHeight() {
     const element = textareaRef.current;
@@ -641,16 +740,19 @@ export function ChatView() {
 
   async function handleSend() {
     const trimmed = input.trim();
-    if (!trimmed || isThinking) return;
+    if (!trimmed || isStreaming || loadingConversationId) return;
 
     const userMessage = createMessage("user", trimmed);
-    setMessages((current) => [...current, userMessage]);
+    const assistantMessage = createMessage("assistant", "");
+    setMessages((current) => [...current, userMessage, assistantMessage]);
     setInput("");
-    setIsThinking(true);
+    setIsStreaming(true);
+    setStreamingMessageId(assistantMessage.id);
     setSendError(null);
+    streamBufferRef.current = { id: assistantMessage.id, content: "" };
 
     try {
-      const result = await sendAgentMessage({
+      const result = await streamAgentMessage({
         message: trimmed,
         conversationId,
         context: {
@@ -659,20 +761,70 @@ export function ChatView() {
           activeProjectId: selectedProjectIds[0] ?? null,
           activeArtifactId: selectedArtifactIds[0] ?? null,
         },
+        onMeta: ({ conversationId: nextConversationId }) => {
+          setConversationId(nextConversationId);
+        },
+        onDelta: (text) => {
+          appendStreamDelta(assistantMessage.id, text);
+        },
+        onDone: ({ reply }) => {
+          flushStreamBuffer();
+          setMessages((current) =>
+            current.map((message) =>
+              message.id === assistantMessage.id
+                ? { ...message, content: reply }
+                : message
+            )
+          );
+        },
       });
 
       setConversationId(result.conversationId);
-      setMessages((current) => [
-        ...current,
-        createMessage("assistant", result.reply),
-      ]);
+      await refreshConversations();
     } catch (error) {
+      flushStreamBuffer();
+      setMessages((current) =>
+        current.filter((message) => message.id !== assistantMessage.id)
+      );
       setSendError(
         error instanceof Error ? error.message : "Failed to send message"
       );
     } finally {
-      setIsThinking(false);
+      setIsStreaming(false);
+      setStreamingMessageId(null);
+      streamBufferRef.current = null;
     }
+  }
+
+  async function handleSelectConversation(nextConversationId: string) {
+    if (
+      nextConversationId === conversationId ||
+      isStreaming ||
+      loadingConversationId
+    ) {
+      return;
+    }
+
+    setLoadingConversationId(nextConversationId);
+    setSendError(null);
+
+    try {
+      const conversation = await fetchConversation(nextConversationId);
+      setConversationId(conversation.id);
+      setMessages(mapDbMessages(conversation.messages));
+    } catch {
+      setSendError("Could not load conversation.");
+    } finally {
+      setLoadingConversationId(null);
+    }
+  }
+
+  function handleNewChat() {
+    if (isStreaming) return;
+    setConversationId(null);
+    setMessages([]);
+    setSendError(null);
+    setInput("");
   }
 
   function handleKeyDown(event: React.KeyboardEvent<HTMLTextAreaElement>) {
@@ -709,36 +861,54 @@ export function ChatView() {
   }
 
   return (
-    <div className="flex h-full min-h-0 flex-col bg-[var(--color-void)]">
-      <div
-        ref={scrollRef}
-        className="min-h-0 flex-1 overflow-y-auto px-4 md:px-6"
-      >
-        <div className="mx-auto flex w-full max-w-3xl flex-col gap-5 py-6">
-          {messages.length === 0 && !isThinking ? (
-            <EmptyState greeting={greeting} />
-          ) : (
-            <>
-              {messages.map((message) =>
-                message.role === "user" ? (
-                  <UserMessage key={message.id} content={message.content} />
-                ) : (
-                  <AssistantMessage
-                    key={message.id}
-                    content={message.content}
-                  />
-                )
-              )}
-              {isThinking ? <ThinkingIndicator /> : null}
-              {sendError ? (
-                <p className="text-[13px] text-[var(--color-ember)]">{sendError}</p>
-              ) : null}
-            </>
-          )}
-        </div>
-      </div>
+    <div className="flex h-full min-h-0 bg-[var(--color-void)]">
+      <ConversationSidebar
+        conversations={conversations}
+        activeConversationId={conversationId}
+        loading={conversationsLoading}
+        onSelectConversation={handleSelectConversation}
+        onNewChat={handleNewChat}
+      />
 
-      <ChatComposer
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+        <div
+          ref={scrollRef}
+          className="min-h-0 flex-1 overflow-y-auto px-4 md:px-6"
+        >
+          <div className="mx-auto flex w-full max-w-3xl flex-col gap-5 py-6">
+            {loadingConversationId ? (
+              <p className="text-[13px] text-[var(--color-pumice)]">
+                Loading conversation…
+              </p>
+            ) : null}
+            {messages.length === 0 && !isStreaming && !loadingConversationId ? (
+              <EmptyState greeting={greeting} />
+            ) : (
+              <>
+                {messages.map((message) =>
+                  message.role === "user" ? (
+                    <UserMessage key={message.id} content={message.content} />
+                  ) : (
+                    <AssistantMessage
+                      key={message.id}
+                      content={message.content}
+                      streaming={
+                        isStreaming && message.id === streamingMessageId
+                      }
+                    />
+                  )
+                )}
+                {sendError ? (
+                  <p className="text-[13px] text-[var(--color-ember)]">
+                    {sendError}
+                  </p>
+                ) : null}
+              </>
+            )}
+          </div>
+        </div>
+
+        <ChatComposer
         input={input}
         canSend={canSend}
         projects={projects}
@@ -772,6 +942,7 @@ export function ChatView() {
         }
         textareaRef={textareaRef}
       />
+      </div>
     </div>
   );
 }

@@ -1,52 +1,20 @@
-import { db } from "@/lib/db";
 import {
   badRequest,
-  json,
-  notFound,
   parseJsonBody,
   requireString,
-  serverError,
 } from "@/lib/api";
-import { assembleContext } from "@/lib/context";
-import { buildSystemPrompt } from "@/lib/agent/system-prompt";
+import {
+  DATE_PATTERN,
+  encodeSse,
+  finalizeAgentRun,
+  optionalId,
+  prepareAgentRun,
+  streamAnthropicReply,
+  type AgentRequestBody,
+  type ParsedAgentRequest,
+} from "@/lib/agent/handler";
 
-const AGENT_CONFIG_ID = "default";
-const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
-
-type AgentRequestBody = {
-  message?: unknown;
-  conversationId?: unknown;
-  context?: {
-    currentTab?: unknown;
-    currentDate?: unknown;
-    activeProjectId?: unknown;
-    activeArtifactId?: unknown;
-  };
-};
-
-type AnthropicMessage = {
-  role: "user" | "assistant";
-  content: string;
-};
-
-type AnthropicResponse = {
-  content?: Array<{ type?: string; text?: string }>;
-  error?: { message?: string };
-};
-
-function optionalId(value: unknown): string | null | undefined {
-  if (value === null) return null;
-  if (value === undefined) return undefined;
-  if (typeof value !== "string" || !value.trim()) {
-    return undefined;
-  }
-  return value.trim();
-}
-
-export async function POST(request: Request) {
-  const body = await parseJsonBody<AgentRequestBody>(request);
-  if (body instanceof Response) return body;
-
+function parseAgentRequest(body: AgentRequestBody): ParsedAgentRequest | Response {
   const message = requireString(body.message, "message");
   if (message instanceof Response) return message;
 
@@ -91,117 +59,85 @@ export async function POST(request: Request) {
     conversationId = body.conversationId.trim();
   }
 
-  try {
-    const config = await db.agentConfig.upsert({
-      where: { id: AGENT_CONFIG_ID },
-      create: { id: AGENT_CONFIG_ID },
-      update: {},
-    });
+  return {
+    message,
+    conversationId,
+    currentTab,
+    currentDate: body.context.currentDate,
+    activeProjectId,
+    activeArtifactId,
+  };
+}
 
-    if (!config.apiKey) {
-      return badRequest("No API key configured — add one in Settings.");
-    }
+export async function POST(request: Request) {
+  const body = await parseJsonBody<AgentRequestBody>(request);
+  if (body instanceof Response) return body;
 
-    const madContext = await assembleContext({
-      currentTab: currentTab.toLowerCase(),
-      currentDate: body.context.currentDate,
-      activeProjectId,
-      activeArtifactId,
-    });
+  const parsed = parseAgentRequest(body);
+  if (parsed instanceof Response) return parsed;
 
-    const systemPrompt = buildSystemPrompt(madContext);
+  const encoder = new TextEncoder();
 
-    let conversation = conversationId
-      ? await db.conversation.findUnique({
-          where: { id: conversationId },
-          include: {
-            messages: {
-              orderBy: { createdAt: "asc" },
-            },
+  const stream = new ReadableStream({
+    async start(controller) {
+      const send = (event: string, data: Record<string, unknown>) => {
+        controller.enqueue(encoder.encode(encodeSse(event, data)));
+      };
+
+      try {
+        const prepared = await prepareAgentRun(parsed);
+
+        send("meta", { conversationId: prepared.conversationId });
+
+        const { reply, inputTokens, outputTokens } = await streamAnthropicReply({
+          apiKey: prepared.config.apiKey!,
+          model: prepared.config.model,
+          systemPrompt: prepared.systemPrompt,
+          message: parsed.message,
+          onDelta: (text) => {
+            send("delta", { text });
           },
-        })
-      : null;
+        });
 
-    if (conversationId && !conversation) {
-      return notFound("Conversation not found");
-    }
+        const result = await finalizeAgentRun({
+          conversationId: prepared.conversationId,
+          madContext: prepared.madContext,
+          reply,
+          model: prepared.config.model,
+          currentDate: parsed.currentDate,
+          inputTokens,
+          outputTokens,
+        });
 
-    if (!conversation) {
-      conversation = await db.conversation.create({
-        data: {},
-        include: { messages: true },
-      });
-    }
+        send("done", {
+          conversationId: result.conversationId,
+          reply: result.reply,
+          inputTokens: result.inputTokens,
+          outputTokens: result.outputTokens,
+        });
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : "Internal server error";
 
-    const priorMessages: AnthropicMessage[] = conversation.messages.map(
-      (entry) => ({
-        role: entry.role as "user" | "assistant",
-        content: entry.content,
-      })
-    );
+        if (message === "Conversation not found") {
+          send("error", { message });
+        } else if (message.startsWith("No API key configured")) {
+          send("error", { message });
+        } else {
+          console.error("[agent POST]", error);
+          send("error", { message });
+        }
+      } finally {
+        controller.close();
+      }
+    },
+  });
 
-    await db.message.create({
-      data: {
-        conversationId: conversation.id,
-        role: "user",
-        content: message,
-      },
-    });
-
-    const anthropicResponse = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "x-api-key": config.apiKey,
-        "anthropic-version": "2023-06-01",
-        "content-type": "application/json",
-      },
-      body: JSON.stringify({
-        model: config.model,
-        max_tokens: 1024,
-        system: systemPrompt,
-        messages: [
-          ...priorMessages,
-          { role: "user", content: message },
-        ],
-      }),
-    });
-
-    const anthropicData = (await anthropicResponse.json()) as AnthropicResponse;
-
-    if (!anthropicResponse.ok) {
-      return badRequest(
-        anthropicData.error?.message ?? "Anthropic API request failed"
-      );
-    }
-
-    const reply = anthropicData.content
-      ?.map((block) => (block.type === "text" ? block.text ?? "" : ""))
-      .join("")
-      .trim();
-
-    if (!reply) {
-      return serverError("Empty response from Anthropic API");
-    }
-
-    await db.message.create({
-      data: {
-        conversationId: conversation.id,
-        role: "assistant",
-        content: reply,
-        contextSnapshot: JSON.stringify(madContext),
-      },
-    });
-
-    await db.conversation.update({
-      where: { id: conversation.id },
-      data: { updatedAt: new Date() },
-    });
-
-    return json({
-      reply,
-      conversationId: conversation.id,
-    });
-  } catch {
-    return serverError();
-  }
+  return new Response(stream, {
+    headers: {
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache, no-transform",
+      Connection: "keep-alive",
+    },
+  });
 }

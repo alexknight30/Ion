@@ -5,7 +5,7 @@ import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/cn";
 import { SmartInput } from "@/components/ui/SmartTextarea";
-import { sendAgentMessage } from "@/lib/agent";
+import { streamAgentMessage } from "@/lib/agent";
 import { getTodayDate, toDateKey } from "@/lib/calendar";
 
 const ease = [0.16, 1, 0.3, 1] as const;
@@ -49,6 +49,9 @@ export function AgentButton({
   const [error, setError] = useState<string | null>(null);
   const [isThinking, setIsThinking] = useState(false);
 
+  const streamBufferRef = useRef("");
+  const streamRafRef = useRef<number | null>(null);
+
   useEffect(() => {
     if (open) {
       inputRef.current?.focus();
@@ -60,8 +63,31 @@ export function AgentButton({
       if (clickTimerRef.current) {
         clearTimeout(clickTimerRef.current);
       }
+      if (streamRafRef.current !== null) {
+        cancelAnimationFrame(streamRafRef.current);
+      }
     };
   }, []);
+
+  const flushReply = (finalReply: string) => {
+    if (streamRafRef.current !== null) {
+      cancelAnimationFrame(streamRafRef.current);
+      streamRafRef.current = null;
+    }
+    streamBufferRef.current = finalReply;
+    setReply(finalReply);
+  };
+
+  const appendReplyDelta = (delta: string) => {
+    streamBufferRef.current += delta;
+
+    if (streamRafRef.current !== null) return;
+
+    streamRafRef.current = requestAnimationFrame(() => {
+      streamRafRef.current = null;
+      setReply(streamBufferRef.current);
+    });
+  };
 
   async function handleSend() {
     const trimmed = query.trim();
@@ -70,19 +96,27 @@ export function AgentButton({
     setIsThinking(true);
     setError(null);
     setReply(null);
+    streamBufferRef.current = "";
 
     try {
-      const result = await sendAgentMessage({
+      const result = await streamAgentMessage({
         message: trimmed,
         conversationId,
         context: {
           currentTab,
           currentDate: toDateKey(getTodayDate()),
         },
+        onMeta: ({ conversationId: nextConversationId }) => {
+          setConversationId(nextConversationId);
+        },
+        onDelta: appendReplyDelta,
+        onDone: ({ reply }) => {
+          flushReply(reply);
+        },
       });
 
       setConversationId(result.conversationId);
-      setReply(result.reply);
+      flushReply(result.reply);
       onQueryChange("");
     } catch (sendError) {
       setError(
@@ -201,9 +235,9 @@ export function AgentButton({
         </AnimatePresence>
       </div>
 
-      {open && (reply || error || isThinking) ? (
+      {open && (reply || error || (isThinking && !reply)) ? (
         <div className="ml-[68px] w-[360px] rounded-[12px] border border-[var(--color-border-subtle)] bg-[var(--color-obsidian)] px-4 py-3 shadow-[0_2px_12px_var(--color-shadow-soft)]">
-          {isThinking ? (
+          {isThinking && !reply ? (
             <p className="text-[13px] text-[var(--color-pumice)]">Thinking…</p>
           ) : null}
           {error ? (
@@ -212,6 +246,9 @@ export function AgentButton({
           {reply ? (
             <p className="whitespace-pre-wrap text-[14px] leading-relaxed tracking-[-0.01em] text-[var(--color-bone)]">
               {reply}
+              {isThinking ? (
+                <span className="ml-0.5 inline-block h-[1em] w-[2px] translate-y-[2px] animate-pulse bg-[var(--color-pumice)]" />
+              ) : null}
             </p>
           ) : null}
         </div>
