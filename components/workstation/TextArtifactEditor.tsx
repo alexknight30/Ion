@@ -34,7 +34,7 @@ export interface TextArtifactEditorHandle {
 const LINE_CLASS =
   "text-[14px] leading-[1.6] tracking-[-0.01em] text-[var(--color-bone)]";
 const CHECKLIST_TEXT_CLASS =
-  "min-w-0 flex-1 whitespace-pre-wrap break-words outline-none";
+  "min-h-[1.6em] min-w-[2px] flex-1 whitespace-pre-wrap break-words outline-none";
 const CHECKLIST_ROW_CLASS = "flex items-start gap-2";
 
 function createBubbleElement(checked: boolean) {
@@ -70,6 +70,39 @@ function getChecklistTextClass(checked: boolean) {
   );
 }
 
+function setChecklistTextContent(text: HTMLElement, content: string) {
+  text.textContent = "";
+
+  if (content) {
+    text.textContent = content;
+    return;
+  }
+
+  const placeholder = document.createElement("br");
+  placeholder.setAttribute("data-checklist-placeholder", "true");
+  text.appendChild(placeholder);
+}
+
+function readChecklistTextContent(text: HTMLElement | null) {
+  if (!text) return "";
+  return (text.textContent ?? "").replace(/\u200B/g, "");
+}
+
+function ensureChecklistTextPlaceholder(row: HTMLElement) {
+  if (row.getAttribute("data-line-kind") !== "checklist") {
+    return;
+  }
+
+  const text = row.querySelector("[data-line-text]");
+  if (!(text instanceof HTMLElement)) {
+    return;
+  }
+
+  if (readChecklistTextContent(text) === "" && !text.querySelector("br")) {
+    setChecklistTextContent(text, "");
+  }
+}
+
 function renderLinesToEditor(root: HTMLElement, lines: TextLine[]) {
   root.innerHTML = "";
 
@@ -84,7 +117,7 @@ function renderLinesToEditor(root: HTMLElement, lines: TextLine[]) {
       const text = document.createElement("span");
       text.setAttribute("data-line-text", "true");
       text.className = getChecklistTextClass(line.checked);
-      text.textContent = line.content;
+      setChecklistTextContent(text, line.content);
 
       row.appendChild(createBubbleElement(line.checked));
       row.appendChild(text);
@@ -117,7 +150,9 @@ function parseEditorDom(root: HTMLElement): TextLine[] {
         return {
           kind: "checklist" as const,
           checked: child.getAttribute("data-checked") === "true",
-          content: child.querySelector("[data-line-text]")?.textContent ?? "",
+          content: readChecklistTextContent(
+            child.querySelector("[data-line-text]")
+          ),
         };
       }
 
@@ -205,6 +240,8 @@ function placeCaretInLine(root: HTMLElement, lineIndex: number, offset = 0) {
 
   if (textNode?.nodeType === Node.TEXT_NODE) {
     range.setStart(textNode, safeOffset);
+  } else if (textElement.querySelector("[data-checklist-placeholder]")) {
+    range.setStartBefore(textElement.firstChild!);
   } else if (length === 0) {
     range.setStart(textElement, 0);
   } else {
@@ -212,6 +249,50 @@ function placeCaretInLine(root: HTMLElement, lineIndex: number, offset = 0) {
   }
 
   range.collapse(true);
+  selection.removeAllRanges();
+  selection.addRange(range);
+}
+
+function selectLineRange(root: HTMLElement, startLine: number, endLine: number) {
+  const normalizedStart = Math.min(startLine, endLine);
+  const normalizedEnd = Math.max(startLine, endLine);
+
+  const startRow = root.querySelector(
+    `[data-line-index="${normalizedStart}"]`
+  );
+  const endRow = root.querySelector(`[data-line-index="${normalizedEnd}"]`);
+
+  if (!(startRow instanceof HTMLElement) || !(endRow instanceof HTMLElement)) {
+    return;
+  }
+
+  const startText = getLineTextElement(startRow);
+  const endText = getLineTextElement(endRow);
+
+  if (!(startText instanceof HTMLElement) || !(endText instanceof HTMLElement)) {
+    return;
+  }
+
+  const selection = window.getSelection();
+  if (!selection) return;
+
+  const range = document.createRange();
+  const startNode = startText.firstChild;
+  const endNode = endText.firstChild;
+  const endLength = endText.textContent?.length ?? 0;
+
+  if (startNode?.nodeType === Node.TEXT_NODE) {
+    range.setStart(startNode, 0);
+  } else {
+    range.setStart(startText, 0);
+  }
+
+  if (endNode?.nodeType === Node.TEXT_NODE) {
+    range.setEnd(endNode, endLength);
+  } else {
+    range.setEnd(endText, endText.childNodes.length);
+  }
+
   selection.removeAllRanges();
   selection.addRange(range);
 }
@@ -236,7 +317,7 @@ function applySubstitutionsAtCaret(root: HTMLElement) {
     return;
   }
 
-  const raw = textElement.textContent ?? "";
+  const raw = readChecklistTextContent(textElement);
   const offset = getCaretOffsetInLine(root);
   const { value, cursor } = applyTextSubstitutions(raw, offset);
 
@@ -244,7 +325,7 @@ function applySubstitutionsAtCaret(root: HTMLElement) {
     return;
   }
 
-  textElement.textContent = value;
+  setChecklistTextContent(textElement, value);
   const lineIndex = Number(row.getAttribute("data-line-index"));
   if (!Number.isNaN(lineIndex)) {
     placeCaretInLine(root, lineIndex, cursor);
@@ -267,6 +348,7 @@ function normalizeLineAttributes(root: HTMLElement) {
     }
 
     child.setAttribute("data-line-index", String(index));
+    ensureChecklistTextPlaceholder(child);
   });
 }
 
@@ -340,7 +422,12 @@ export const TextArtifactEditor = forwardRef<
   }, []);
 
   const applySerializedContent = useCallback(
-    (serialized: string, focusLineIndex?: number, focusOffset?: number) => {
+    (
+      serialized: string,
+      focusLineIndex?: number,
+      focusOffset?: number,
+      selectionLineRange?: { startLine: number; endLine: number }
+    ) => {
       contentRef.current = serialized;
       onContentChange(serialized);
 
@@ -349,6 +436,18 @@ export const TextArtifactEditor = forwardRef<
 
       isLocalEditRef.current = true;
       renderLinesToEditor(root, parseTextArtifactContent(serialized));
+
+      if (selectionLineRange) {
+        requestAnimationFrame(() => {
+          root.focus();
+          selectLineRange(
+            root,
+            selectionLineRange.startLine,
+            selectionLineRange.endLine
+          );
+        });
+        return;
+      }
 
       if (focusLineIndex !== undefined) {
         requestAnimationFrame(() => {
@@ -361,12 +460,18 @@ export const TextArtifactEditor = forwardRef<
   );
 
   const commit = useCallback(
-    (lines: TextLine[], focusLineIndex?: number, focusOffset?: number) => {
+    (
+      lines: TextLine[],
+      focusLineIndex?: number,
+      focusOffset?: number,
+      selectionLineRange?: { startLine: number; endLine: number }
+    ) => {
       recordUndo();
       applySerializedContent(
         serializeTextArtifactContent(lines),
         focusLineIndex,
-        focusOffset
+        focusOffset,
+        selectionLineRange
       );
     },
     [applySerializedContent, recordUndo]
@@ -419,8 +524,7 @@ export const TextArtifactEditor = forwardRef<
         selectionRange.startLine,
         selectionRange.endLine
       );
-      commit(next, selectionRange.endLine);
-      window.getSelection()?.removeAllRanges();
+      commit(next, undefined, undefined, selectionRange);
       return;
     }
 
@@ -493,23 +597,50 @@ export const TextArtifactEditor = forwardRef<
     const target = event.target;
     if (!(target instanceof Element)) return;
 
+    const root = editorRef.current;
+    if (!root) return;
+
     const bubble = target.closest("[data-checklist-bubble]");
-    const row = bubble?.closest("[data-line-index]");
+    const bubbleRow = bubble?.closest("[data-line-index]");
 
-    if (!(row instanceof HTMLElement) || !editorRef.current?.contains(row)) {
+    if (
+      bubble &&
+      bubbleRow instanceof HTMLElement &&
+      root.contains(bubbleRow) &&
+      bubbleRow.getAttribute("data-line-kind") === "checklist"
+    ) {
+      event.preventDefault();
+
+      recordUndo();
+      const checked = bubbleRow.getAttribute("data-checked") === "true";
+      updateChecklistRowVisual(bubbleRow, !checked);
+      syncFromDom();
       return;
     }
 
-    if (row.getAttribute("data-line-kind") !== "checklist") {
+    const row = target.closest("[data-line-kind='checklist'][data-line-index]");
+    if (!(row instanceof HTMLElement) || !root.contains(row)) {
       return;
     }
 
-    event.preventDefault();
+    const textElement = getLineTextElement(row);
+    if (!(textElement instanceof HTMLElement)) {
+      return;
+    }
 
-    recordUndo();
-    const checked = row.getAttribute("data-checked") === "true";
-    updateChecklistRowVisual(row, !checked);
-    syncFromDom();
+    if (textElement.contains(target) || target === textElement) {
+      return;
+    }
+
+    const lineIndex = Number(row.getAttribute("data-line-index"));
+    if (Number.isNaN(lineIndex)) {
+      return;
+    }
+
+    requestAnimationFrame(() => {
+      root.focus();
+      placeCaretInLine(root, lineIndex, readChecklistTextContent(textElement).length);
+    });
   }
 
   function handleKeyDown(event: ReactKeyboardEvent<HTMLDivElement>) {
@@ -568,12 +699,31 @@ export const TextArtifactEditor = forwardRef<
 
       const lineIndex = getCaretLineIndex(root);
       const offset = getCaretOffsetInLine(root);
+      const lines = parseEditorDom(root);
+      const current = lines[lineIndex];
+
+      if (
+        current?.kind === "checklist" &&
+        current.content.trim() === "" &&
+        offset === 0
+      ) {
+        event.preventDefault();
+
+        if (lines.length === 1) {
+          commit([{ kind: "text", content: "" }], 0);
+          return;
+        }
+
+        const next = lines.filter((_, index) => index !== lineIndex);
+        const focusIndex = Math.min(lineIndex, next.length - 1);
+        const focusLine = next[focusIndex];
+        commit(next, focusIndex, focusLine?.content.length ?? 0);
+        return;
+      }
 
       if (offset === 0 && lineIndex > 0) {
         event.preventDefault();
-        const lines = parseEditorDom(root);
         const previous = lines[lineIndex - 1];
-        const current = lines[lineIndex];
         const mergedContent = `${previous.content}${current.content}`;
         const focusOffset = previous.content.length;
 
