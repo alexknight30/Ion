@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { RefreshCw } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { fieldLabelClassName, inputClassName } from "@/lib/form-styles";
 import {
@@ -78,24 +79,71 @@ function ReadOnlyField({
   );
 }
 
-export function UsagePanel() {
+interface UsagePanelProps {
+  isActive?: boolean;
+}
+
+export function UsagePanel({ isActive = true }: UsagePanelProps) {
   const [stats, setStats] = useState<TokenUsageStats>(EMPTY_USAGE_STATS);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const hasLoadedOnce = useRef(false);
 
-  useEffect(() => {
-    fetchUsageStats()
-      .then(setStats)
-      .catch(() => {
-        setError("Could not load usage stats.");
-      })
-      .finally(() => {
-        setLoading(false);
-      });
+  const loadStats = useCallback(async (background = false) => {
+    if (background) {
+      setRefreshing(true);
+    } else {
+      setLoading(true);
+    }
+    setError(null);
+
+    try {
+      const data = await fetchUsageStats();
+      setStats(data);
+      hasLoadedOnce.current = true;
+    } catch {
+      setError("Could not load usage stats.");
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
   }, []);
 
+  useEffect(() => {
+    if (!isActive) return;
+
+    if (!hasLoadedOnce.current) {
+      void loadStats(false);
+      return;
+    }
+
+    void loadStats(true);
+  }, [isActive, loadStats]);
+
   return (
-    <SettingsSection label="Usage" index={2}>
+    <SettingsSection
+      label="Usage"
+      index={2}
+      status={refreshing ? "Refreshing…" : undefined}
+      headerAction={
+        <button
+          type="button"
+          onClick={() => {
+            void loadStats(true);
+          }}
+          disabled={loading || refreshing}
+          aria-label="Refresh usage stats"
+          className="flex h-7 w-7 items-center justify-center rounded-[6px] text-[var(--color-pumice)] transition-colors duration-200 hover:bg-[var(--color-ash)] hover:text-[var(--color-steam)] disabled:opacity-50"
+        >
+          <RefreshCw
+            size={14}
+            strokeWidth={1.5}
+            className={refreshing ? "animate-spin" : undefined}
+          />
+        </button>
+      }
+    >
       {error ? (
         <p className="mb-4 text-[13px] text-[var(--color-ember)]">{error}</p>
       ) : null}

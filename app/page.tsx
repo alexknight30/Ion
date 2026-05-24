@@ -169,22 +169,21 @@ function WorkView() {
   );
 }
 
-function SettingsView() {
+function SettingsView({ isActive }: { isActive: boolean }) {
   return (
     <div className="flex flex-col gap-6">
       <ProfilePanel />
       <AgentPanel />
-      <UsagePanel />
+      <UsagePanel isActive={isActive} />
       <IntegrationsPanel />
       <PreferencesPanel />
     </div>
   );
 }
 
-const views: Record<Exclude<Tab, "Organize">, ReactNode> = {
+const views: Record<Exclude<Tab, "Organize" | "Settings">, ReactNode> = {
   Work: <WorkView />,
   Chat: <ChatView />,
-  Settings: <SettingsView />,
 };
 
 const tabLayout: Record<Tab, string> = {
@@ -234,11 +233,16 @@ export default function Home() {
             onInboxExpandedChange={setInboxExpanded}
           />
         </div>
-        {(Object.keys(views) as Array<Exclude<Tab, "Organize">>).map((tab) => (
-          <div key={tab} hidden={activeTab !== tab} className={tabLayout[tab]}>
-            {views[tab]}
-          </div>
-        ))}
+        {(Object.keys(views) as Array<Exclude<Tab, "Organize" | "Settings">>).map(
+          (tab) => (
+            <div key={tab} hidden={activeTab !== tab} className={tabLayout[tab]}>
+              {views[tab]}
+            </div>
+          )
+        )}
+        <div hidden={activeTab !== "Settings"} className={tabLayout.Settings}>
+          <SettingsView isActive={activeTab === "Settings"} />
+        </div>
       </main>
       {activeTab !== "Chat" ? (
         <AgentButton
