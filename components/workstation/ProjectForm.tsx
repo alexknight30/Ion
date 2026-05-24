@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { cn } from "@/lib/cn";
+import { SmartInput, SmartTextarea } from "@/components/ui/SmartTextarea";
 import {
   PROJECT_COLORS,
   WORK_TYPES,
@@ -82,10 +83,10 @@ export function ProjectForm({ project, onSave, onCancel }: ProjectFormProps) {
       <div className="flex flex-col gap-5">
         <div>
           <FieldLabel>Title</FieldLabel>
-          <input
+          <SmartInput
             type="text"
             value={title}
-            onChange={(event) => setTitle(event.target.value)}
+            onChange={setTitle}
             placeholder="Project name"
             className={inputClassName}
             autoFocus
@@ -94,9 +95,9 @@ export function ProjectForm({ project, onSave, onCancel }: ProjectFormProps) {
 
         <div>
           <FieldLabel>Description</FieldLabel>
-          <textarea
+          <SmartTextarea
             value={description}
-            onChange={(event) => setDescription(event.target.value)}
+            onChange={setDescription}
             placeholder="What is this project about?"
             rows={2}
             className={cn(inputClassName, "resize-none leading-[1.5]")}

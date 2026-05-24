@@ -13,6 +13,7 @@ interface AccordionPanelProps {
   children?: React.ReactNode;
   scrollContent?: boolean;
   expandSize?: "fill" | "limited";
+  contentClassName?: string;
   className?: string;
 }
 
@@ -31,6 +32,7 @@ export function AccordionPanel({
   children,
   scrollContent = true,
   expandSize = "fill",
+  contentClassName,
   className,
 }: AccordionPanelProps) {
   return (
@@ -79,8 +81,9 @@ export function AccordionPanel({
             className={cn(
               "flex min-h-0 flex-col",
               isOpen && "h-full",
-              isOpen && scrollContent && "overflow-y-auto",
-              isOpen && !scrollContent && "overflow-hidden"
+              isOpen && scrollContent && "overflow-y-auto [scrollbar-gutter:stable]",
+              isOpen && !scrollContent && "overflow-hidden",
+              contentClassName
             )}
           >
             {children}

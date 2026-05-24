@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { X } from "lucide-react";
+import { ListChecks, X } from "lucide-react";
 import { Surface } from "@/components/ui/Surface";
 import { Label } from "@/components/ui/Label";
 import { SketchEditor } from "@/components/workstation/SketchEditor";
+import { TextArtifactEditor, type TextArtifactEditorHandle } from "@/components/workstation/TextArtifactEditor";
+import { SmartTextarea } from "@/components/ui/SmartTextarea";
 import {
   getArtifactDisplayTitle,
   getArtifactTypeLabel,
@@ -154,10 +156,10 @@ function ThoughtEntry({
           </span>
         ) : null}
       </div>
-      <textarea
+      <SmartTextarea
         ref={textareaRef}
         value={content}
-        onChange={(event) => handleChange(event.target.value)}
+        onChange={handleChange}
         onBlur={handleBlur}
         rows={1}
         className="w-full resize-none overflow-hidden bg-transparent text-[14px] leading-[1.6] tracking-[-0.01em] text-[var(--color-bone)] outline-none placeholder:text-[var(--color-pumice)]"
@@ -257,16 +259,17 @@ function ThoughtJournalView({
 function TextArtifactView({
   artifact,
   onContentChange,
+  editorRef,
 }: {
   artifact: Artifact;
   onContentChange: (content: string) => void;
+  editorRef: React.RefObject<TextArtifactEditorHandle | null>;
 }) {
   return (
-    <textarea
-      value={artifact.content ?? ""}
-      onChange={(event) => onContentChange(event.target.value)}
-      placeholder="Start writing…"
-      className="min-h-0 flex-1 resize-none bg-transparent text-[14px] leading-[1.6] tracking-[-0.01em] text-[var(--color-bone)] outline-none placeholder:text-[var(--color-pumice)]"
+    <TextArtifactEditor
+      ref={editorRef}
+      content={artifact.content ?? ""}
+      onContentChange={onContentChange}
     />
   );
 }
@@ -281,6 +284,7 @@ export function Whiteboard({
   const [artifact, setArtifact] = useState<Artifact | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const textEditorRef = useRef<TextArtifactEditorHandle>(null);
 
   useEffect(() => {
     if (!artifactId) {
@@ -369,11 +373,12 @@ export function Whiteboard({
 
   const isJournal = artifact?.kind === THOUGHTS_JOURNAL_KIND;
   const isSketch = artifact?.kind === SKETCH_ARTIFACT_KIND;
+  const isTextArtifact = Boolean(artifact && !isJournal && !isSketch);
   const displayTitle = artifact ? getArtifactDisplayTitle(artifact) : null;
 
   return (
     <Surface index={index} className="flex min-h-0 h-full flex-col !p-0">
-      <div className="relative flex shrink-0 items-center gap-2.5 px-4 py-4 pr-12">
+      <div className="relative flex shrink-0 items-center gap-2.5 px-4 py-4 pr-20">
         <Label className="shrink-0">{displayTitle ?? "Whiteboard"}</Label>
         {artifact ? (
           <>
@@ -381,6 +386,17 @@ export function Whiteboard({
             <ArtifactProjectBadge project={artifact.project} />
           </>
         ) : null}
+        {artifactId && isTextArtifact && (
+          <button
+            type="button"
+            aria-label="Insert checklist"
+            title="Insert checklist (Option + -)"
+            onClick={() => textEditorRef.current?.insertChecklist()}
+            className="absolute right-10 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-[6px] text-[var(--color-pumice)] transition-colors duration-200 hover:bg-[var(--color-ash)] hover:text-[var(--color-steam)]"
+          >
+            <ListChecks size={16} strokeWidth={1.5} />
+          </button>
+        )}
         {artifactId && (
           <button
             type="button"
@@ -422,6 +438,7 @@ export function Whiteboard({
               <TextArtifactView
                 artifact={artifact}
                 onContentChange={handleContentChange}
+                editorRef={textEditorRef}
               />
             )}
           </div>

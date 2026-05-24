@@ -12,6 +12,7 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import { Surface } from "@/components/ui/Surface";
 import { Label } from "@/components/ui/Label";
+import { SmartTextarea } from "@/components/ui/SmartTextarea";
 import { cn } from "@/lib/cn";
 import {
   CALENDAR_PANEL_HEIGHT_CLASS,
@@ -285,9 +286,9 @@ function GmailThreadView({
         <span className="mb-2 block text-[12px] font-medium tracking-[-0.01em] text-[var(--color-pumice)]">
           Reply to {message.from}
         </span>
-        <textarea
+        <SmartTextarea
           value={reply}
-          onChange={(event) => onReplyChange(event.target.value)}
+          onChange={onReplyChange}
           placeholder="Write a reply…"
           rows={4}
           className="w-full resize-none bg-transparent text-[14px] leading-[1.6] tracking-[-0.01em] text-[var(--color-bone)] outline-none placeholder:text-[var(--color-pumice)]"
@@ -349,9 +350,9 @@ function ChatThreadView({
       </div>
 
       <div className="mt-3 shrink-0 rounded-[8px] border border-[var(--color-border-subtle)] bg-[var(--color-obsidian)] p-3">
-        <textarea
+        <SmartTextarea
           value={reply}
-          onChange={(event) => onReplyChange(event.target.value)}
+          onChange={onReplyChange}
           placeholder="Write a reply…"
           rows={3}
           className="w-full resize-none bg-transparent text-[14px] leading-[1.6] tracking-[-0.01em] text-[var(--color-bone)] outline-none placeholder:text-[var(--color-pumice)]"

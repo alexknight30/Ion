@@ -8,6 +8,7 @@ import {
   type UpdateProfileInput,
 } from "@/lib/profile";
 import { fieldLabelClassName, inputClassName } from "@/lib/form-styles";
+import { SmartInput } from "@/components/ui/SmartTextarea";
 import { SettingsSection } from "./SettingsSection";
 
 const PROFILE_FIELDS = [
@@ -119,11 +120,11 @@ export function ProfilePanel() {
               <label htmlFor={`profile-${key}`} className={fieldLabelClassName}>
                 {label}
               </label>
-              <input
+              <SmartInput
                 id={`profile-${key}`}
                 type="text"
                 value={values[key]}
-                onChange={(event) => handleChange(key, event.target.value)}
+                onChange={(value) => handleChange(key, value)}
                 onBlur={(event) => handleBlur(key, event.target.value)}
                 placeholder={placeholder}
                 className={inputClassName}

@@ -13,6 +13,10 @@ import {
   type CreateArtifactInput,
 } from "@/lib/artifacts";
 import { MISC_THOUGHTS_TITLE, THOUGHTS_JOURNAL_KIND } from "@/lib/artifact-constants";
+import {
+  getArtifactRecents,
+  sortArtifactsByRecent,
+} from "@/lib/artifact-recents";
 import { fetchProjects, type Project } from "@/lib/projects";
 
 interface ArtifactsPanelProps {
@@ -20,8 +24,10 @@ interface ArtifactsPanelProps {
   isOpen: boolean;
   onToggle: () => void;
   onOpenArtifact: (artifactId: string) => void;
+  activeArtifactId?: string | null;
   refreshKey?: number;
   projectsRefreshKey?: number;
+  recentSortKey?: number;
 }
 
 export function ArtifactsPanel({
@@ -29,8 +35,10 @@ export function ArtifactsPanel({
   isOpen,
   onToggle,
   onOpenArtifact,
+  activeArtifactId = null,
   refreshKey = 0,
   projectsRefreshKey = 0,
+  recentSortKey = 0,
 }: ArtifactsPanelProps) {
   const [miscThoughts, setMiscThoughts] = useState<Artifact | null>(null);
   const [projectThoughtJournals, setProjectThoughtJournals] = useState<Artifact[]>(
@@ -40,6 +48,7 @@ export function ArtifactsPanel({
   const [projects, setProjects] = useState<Project[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [sortedArtifacts, setSortedArtifacts] = useState<Artifact[]>([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -60,20 +69,12 @@ export function ArtifactsPanel({
           ) ?? null
         );
         setProjectThoughtJournals(
-          artifactList
-            .filter(
-              (artifact) =>
-                artifact.isSystem &&
-                artifact.kind === THOUGHTS_JOURNAL_KIND &&
-                artifact.projectId
-            )
-            .sort((left, right) =>
-              (left.project?.name ?? "").localeCompare(
-                right.project?.name ?? "",
-                undefined,
-                { sensitivity: "base" }
-              )
-            )
+          artifactList.filter(
+            (artifact) =>
+              artifact.isSystem &&
+              artifact.kind === THOUGHTS_JOURNAL_KIND &&
+              artifact.projectId
+          )
         );
         setArtifacts(artifactList.filter((artifact) => !artifact.isSystem));
         setProjects(projectList);
@@ -95,6 +96,15 @@ export function ArtifactsPanel({
       cancelled = true;
     };
   }, [refreshKey, projectsRefreshKey]);
+
+  useEffect(() => {
+    const combined = [
+      ...(miscThoughts ? [miscThoughts] : []),
+      ...projectThoughtJournals,
+      ...artifacts,
+    ];
+    setSortedArtifacts(sortArtifactsByRecent(combined, getArtifactRecents()));
+  }, [miscThoughts, projectThoughtJournals, artifacts, recentSortKey]);
 
   useEffect(() => {
     if (!isOpen) setShowForm(false);
@@ -130,6 +140,7 @@ export function ArtifactsPanel({
       onToggle={onToggle}
       headerAction={isOpen ? headerAction : undefined}
       scrollContent={!showForm}
+      contentClassName="pr-1"
     >
       {showForm ? (
         <ArtifactForm
@@ -138,39 +149,20 @@ export function ArtifactsPanel({
           onCancel={() => setShowForm(false)}
         />
       ) : (
-        <div className="flex min-h-0 flex-1 flex-col">
-          {!loading &&
-            (miscThoughts ||
-              projectThoughtJournals.length > 0 ||
-              artifacts.length > 0) && (
+        <div className="flex min-h-0 flex-1 flex-col pr-3">
+          {!loading && sortedArtifacts.length > 0 && (
             <div className="flex flex-col divide-y divide-[var(--color-border-subtle)]">
-              {miscThoughts && (
-                <ArtifactRow
-                  key={miscThoughts.id}
-                  artifact={miscThoughts}
-                  onOpen={onOpenArtifact}
-                />
-              )}
-              {projectThoughtJournals.map((artifact) => (
+              {sortedArtifacts.map((artifact) => (
                 <ArtifactRow
                   key={artifact.id}
                   artifact={artifact}
-                  onOpen={onOpenArtifact}
-                />
-              ))}
-              {artifacts.map((artifact) => (
-                <ArtifactRow
-                  key={artifact.id}
-                  artifact={artifact}
+                  isActive={artifact.id === activeArtifactId}
                   onOpen={onOpenArtifact}
                 />
               ))}
             </div>
           )}
-          {!loading &&
-            !miscThoughts &&
-            projectThoughtJournals.length === 0 &&
-            artifacts.length === 0 && (
+          {!loading && sortedArtifacts.length === 0 && (
             <div className={cn("flex flex-1 items-center justify-center py-8")} />
           )}
         </div>

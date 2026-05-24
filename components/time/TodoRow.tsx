@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Check, GripVertical } from "lucide-react";
 import { cn } from "@/lib/cn";
+import { SmartInput } from "@/components/ui/SmartTextarea";
 import type { Project } from "@/lib/projects";
 import type { Todo } from "@/lib/todos";
 
@@ -512,11 +513,11 @@ export function TodoRow({
             </span>
           </button>
 
-          <input
+          <SmartInput
             ref={inputRef}
             type="text"
             value={title}
-            onChange={(event) => handleTitleChange(event.target.value)}
+            onChange={handleTitleChange}
             onBlur={() => void handleTitleBlur()}
             placeholder="New task"
             className={cn(

@@ -4,6 +4,7 @@ import { useEffect, useRef } from "react";
 import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/cn";
+import { SmartInput } from "@/components/ui/SmartTextarea";
 
 const ease = [0.16, 1, 0.3, 1] as const;
 const CLICK_DELAY_MS = 250;
@@ -129,11 +130,11 @@ export function AgentButton({
             className="overflow-hidden"
           >
             <div className="flex h-14 w-[360px] items-center rounded-[12px] border border-[var(--color-border-active)] bg-[var(--color-obsidian)] shadow-[0_2px_12px_var(--color-shadow-soft),0_0_0_1px_var(--color-border-subtle)]">
-              <input
+              <SmartInput
                 ref={inputRef}
                 type="text"
                 value={query}
-                onChange={(e) => onQueryChange(e.target.value)}
+                onChange={onQueryChange}
                 onKeyDown={(e) => {
                   if (e.key === "Enter") handleSend();
                 }}

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { AccordionPanel } from "@/components/workstation/AccordionPanel";
 import { ArtifactSelect } from "@/components/workstation/ArtifactSelect";
+import { SmartTextarea } from "@/components/ui/SmartTextarea";
 import { cn } from "@/lib/cn";
 import { fetchArtifacts, type Artifact } from "@/lib/artifacts";
 import {
@@ -141,9 +142,9 @@ export function ThoughtsPanel({
       scrollContent={false}
     >
       <div className="flex min-h-0 flex-1 flex-col">
-        <textarea
+        <SmartTextarea
           value={content}
-          onChange={(event) => setContent(event.target.value)}
+          onChange={setContent}
           placeholder={loading ? "Loading…" : placeholder}
           disabled={loading}
           className={cn(

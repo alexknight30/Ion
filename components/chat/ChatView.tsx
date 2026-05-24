@@ -10,6 +10,7 @@ import {
   X,
 } from "lucide-react";
 import Image from "next/image";
+import { SmartTextarea } from "@/components/ui/SmartTextarea";
 import { cn } from "@/lib/cn";
 import { getMockChatResponse } from "@/lib/chat-mock";
 import { getRandomChatGreeting } from "@/lib/chat-greetings";
@@ -507,10 +508,10 @@ function ChatComposer({
               }}
             />
 
-            <textarea
+            <SmartTextarea
               ref={textareaRef}
               value={input}
-              onChange={(event) => onInputChange(event.target.value)}
+              onChange={onInputChange}
               onKeyDown={onKeyDown}
               placeholder="Ask Ion"
               rows={1}

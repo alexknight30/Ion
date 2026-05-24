@@ -23,6 +23,7 @@ import { TodoListPanel } from "@/components/time/TodoListPanel";
 import { ChatView } from "@/components/chat/ChatView";
 import { getTodayDate } from "@/lib/calendar";
 import { cn } from "@/lib/cn";
+import { touchArtifactRecent } from "@/lib/artifact-recents";
 
 type WorkSection = "Projects" | "Thoughts" | "Artifacts";
 
@@ -102,12 +103,15 @@ function WorkView() {
   const [activeNoteId, setActiveNoteId] = useState<string | null>(null);
   const [whiteboardRefreshKey, setWhiteboardRefreshKey] = useState(0);
   const [projectsRefreshKey, setProjectsRefreshKey] = useState(0);
+  const [artifactRecentsKey, setArtifactRecentsKey] = useState(0);
 
   const handleToggle = (section: WorkSection) => {
     setOpenSection((current) => (current === section ? null : section));
   };
 
   const handleOpenArtifact = (artifactId: string, noteId?: string) => {
+    touchArtifactRecent(artifactId);
+    setArtifactRecentsKey((current) => current + 1);
     if (artifactId !== activeArtifactId) {
       setWhiteboardRefreshKey((current) => current + 1);
     }
@@ -140,8 +144,10 @@ function WorkView() {
           isOpen={openSection === "Artifacts"}
           onToggle={() => handleToggle("Artifacts")}
           onOpenArtifact={handleOpenArtifact}
+          activeArtifactId={activeArtifactId}
           refreshKey={whiteboardRefreshKey}
           projectsRefreshKey={projectsRefreshKey}
+          recentSortKey={artifactRecentsKey}
         />
         <ThoughtsPanel
           index={2}
