@@ -8,6 +8,7 @@ import { SmartInput } from "@/components/ui/SmartTextarea";
 import { FormattedText } from "@/components/ui/FormattedText";
 import { UserMessage } from "@/components/chat/UserMessage";
 import { streamAgentMessage } from "@/lib/agent";
+import { fetchConversation } from "@/lib/conversations";
 import { getTodayDate, toDateKey } from "@/lib/calendar";
 
 const ease = [0.16, 1, 0.3, 1] as const;
@@ -35,6 +36,8 @@ interface AgentButtonProps extends AgentButtonState {
   placeholder?: string;
   className?: string;
   onOpenInChat?: (conversationId: string) => void;
+  resyncConversationId?: string | null;
+  onResyncHandled?: () => void;
 }
 
 export function AgentButton({
@@ -48,6 +51,8 @@ export function AgentButton({
   onDockedChange,
   onQueryChange,
   onOpenInChat,
+  resyncConversationId = null,
+  onResyncHandled,
 }: AgentButtonProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const clickTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -80,6 +85,44 @@ export function AgentButton({
       }
     };
   }, []);
+
+  useEffect(() => {
+    if (!resyncConversationId) return;
+
+    let cancelled = false;
+
+    void fetchConversation(resyncConversationId)
+      .then((conversation) => {
+        if (cancelled) return;
+
+        const lastAssistant = [...conversation.messages]
+          .reverse()
+          .find((message) => message.role === "assistant");
+        const lastUser = [...conversation.messages]
+          .reverse()
+          .find((message) => message.role === "user");
+
+        setConversationId(conversation.id);
+        setLastUserMessage(lastUser?.content ?? null);
+        setReply(lastAssistant?.content ?? null);
+        setError(null);
+        setIsThinking(false);
+        streamBufferRef.current = lastAssistant?.content ?? "";
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setError("Could not restore conversation.");
+      })
+      .finally(() => {
+        if (!cancelled) {
+          onResyncHandled?.();
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [resyncConversationId, onResyncHandled]);
 
   const flushReply = (finalReply: string) => {
     if (streamRafRef.current !== null) {

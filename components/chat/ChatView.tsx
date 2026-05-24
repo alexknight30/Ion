@@ -583,9 +583,11 @@ function ChatComposer({
 export function ChatView({
   openConversationId = null,
   onOpenConversationHandled,
+  onActiveConversationChange,
 }: {
   openConversationId?: string | null;
   onOpenConversationHandled?: () => void;
+  onActiveConversationChange?: (conversationId: string | null) => void;
 } = {}) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
@@ -680,6 +682,10 @@ export function ChatView({
   useEffect(() => {
     void refreshConversations();
   }, []);
+
+  useEffect(() => {
+    onActiveConversationChange?.(conversationId);
+  }, [conversationId, onActiveConversationChange]);
 
   useEffect(() => {
     if (!openConversationId || isStreaming) return;

@@ -202,6 +202,13 @@ export default function Home() {
   const [pendingChatConversationId, setPendingChatConversationId] = useState<
     string | null
   >(null);
+  const [chatActiveConversationId, setChatActiveConversationId] = useState<
+    string | null
+  >(null);
+  const [agentResyncConversationId, setAgentResyncConversationId] = useState<
+    string | null
+  >(null);
+  const previousTabRef = useRef<Tab>("Organize");
   const wasEmailModeRef = useRef(false);
 
   const emailModeOnOrganize = activeTab === "Organize" && inboxExpanded;
@@ -221,6 +228,20 @@ export default function Home() {
     }
     wasEmailModeRef.current = emailModeOnOrganize;
   }, [emailModeOnOrganize, agentDocked]);
+
+  useEffect(() => {
+    const previousTab = previousTabRef.current;
+
+    if (
+      previousTab === "Chat" &&
+      activeTab !== "Chat" &&
+      chatActiveConversationId
+    ) {
+      setAgentResyncConversationId(chatActiveConversationId);
+    }
+
+    previousTabRef.current = activeTab;
+  }, [activeTab, chatActiveConversationId]);
 
   return (
     <div className="flex h-dvh flex-col overflow-hidden">
@@ -246,25 +267,27 @@ export default function Home() {
           <ChatView
             openConversationId={pendingChatConversationId}
             onOpenConversationHandled={() => setPendingChatConversationId(null)}
+            onActiveConversationChange={setChatActiveConversationId}
           />
         </div>
         <div hidden={activeTab !== "Settings"} className={tabLayout.Settings}>
           <SettingsView isActive={activeTab === "Settings"} />
         </div>
       </main>
-      {activeTab !== "Chat" ? (
-        <AgentButton
-          {...agentState}
-          currentTab={activeTab.toLowerCase()}
-          placeholder={
-            emailModeOnOrganize ? "Need help drafting?" : "Ask Ion"
-          }
-          onOpenInChat={(conversationId) => {
-            setPendingChatConversationId(conversationId);
-            setActiveTab("Chat");
-          }}
-        />
-      ) : null}
+      <AgentButton
+        {...agentState}
+        currentTab={activeTab.toLowerCase()}
+        placeholder={
+          emailModeOnOrganize ? "Need help drafting?" : "Ask Ion"
+        }
+        className={activeTab === "Chat" ? "pointer-events-none invisible" : undefined}
+        onOpenInChat={(conversationId) => {
+          setPendingChatConversationId(conversationId);
+          setActiveTab("Chat");
+        }}
+        resyncConversationId={agentResyncConversationId}
+        onResyncHandled={() => setAgentResyncConversationId(null)}
+      />
     </div>
   );
 }

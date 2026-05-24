@@ -1,4 +1,64 @@
 import { db } from "@/lib/db";
+import { THOUGHTS_JOURNAL_KIND } from "@/lib/artifact-constants";
+
+const RECENT_WORK_ACTIVITY_LIMIT = 20;
+
+function noteActivityTitle(content: string) {
+  const firstLine = content.split("\n").find((line) => line.trim().length > 0);
+  if (!firstLine) return "Untitled note";
+  const trimmed = firstLine.trim();
+  return trimmed.length > 80 ? `${trimmed.slice(0, 80)}…` : trimmed;
+}
+
+function buildRecentWorkActivity(
+  projects: Array<{ name: string; updatedAt: Date }>,
+  artifacts: Array<{
+    title: string;
+    updatedAt: Date;
+    project: { name: string } | null;
+  }>,
+  notes: Array<{
+    content: string;
+    updatedAt: Date;
+    artifact: {
+      title: string;
+      kind: string;
+      project: { name: string } | null;
+    };
+  }>
+): AvailableContext["recentWorkActivity"] {
+  const activity: AvailableContext["recentWorkActivity"] = [
+    ...projects.map((project) => ({
+      type: "project" as const,
+      title: project.name,
+      updatedAt: project.updatedAt.toISOString(),
+    })),
+    ...artifacts.map((artifact) => ({
+      type: "artifact" as const,
+      title: artifact.title,
+      projectName: artifact.project?.name,
+      updatedAt: artifact.updatedAt.toISOString(),
+    })),
+    ...notes.map((note) => {
+      const isThoughtJournal = note.artifact.kind === THOUGHTS_JOURNAL_KIND;
+      return {
+        type: isThoughtJournal ? ("thought" as const) : ("note" as const),
+        title: isThoughtJournal
+          ? noteActivityTitle(note.content)
+          : note.artifact.title,
+        projectName: note.artifact.project?.name,
+        updatedAt: note.updatedAt.toISOString(),
+      };
+    }),
+  ];
+
+  return activity
+    .sort(
+      (left, right) =>
+        new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime()
+    )
+    .slice(0, RECENT_WORK_ACTIVITY_LIMIT);
+}
 
 export type ManualContext = {
   profile: {
@@ -39,12 +99,14 @@ export type AvailableContext = {
     id: string;
     name: string;
     description?: string;
+    updatedAt: string;
   }[];
   todosToday: {
     id: string;
     title: string;
     completed: boolean;
     projectName?: string;
+    updatedAt: string;
   }[];
   allProjectNames: string[];
   allArtifactTitles: {
@@ -52,6 +114,13 @@ export type AvailableContext = {
     title: string;
     kind: string;
     projectName?: string;
+    updatedAt: string;
+  }[];
+  recentWorkActivity: {
+    type: "project" | "artifact" | "thought" | "note";
+    title: string;
+    projectName?: string;
+    updatedAt: string;
   }[];
 };
 
@@ -82,6 +151,7 @@ export async function assembleContext(params: {
     todosToday,
     projects,
     artifacts,
+    recentNotes,
   ] = await Promise.all([
     db.profile.upsert({
       where: { id: "default" },
@@ -138,9 +208,25 @@ export async function assembleContext(params: {
         id: true,
         title: true,
         kind: true,
+        updatedAt: true,
         project: { select: { name: true } },
       },
       orderBy: { updatedAt: "desc" },
+    }),
+    db.note.findMany({
+      orderBy: { updatedAt: "desc" },
+      take: 40,
+      select: {
+        content: true,
+        updatedAt: true,
+        artifact: {
+          select: {
+            title: true,
+            kind: true,
+            project: { select: { name: true } },
+          },
+        },
+      },
     }),
   ]);
 
@@ -148,7 +234,14 @@ export async function assembleContext(params: {
     id: project.id,
     name: project.name,
     description: project.description ?? undefined,
+    updatedAt: project.updatedAt.toISOString(),
   }));
+
+  const recentWorkActivity = buildRecentWorkActivity(
+    projects,
+    artifacts,
+    recentNotes
+  );
 
   return {
     manual: {
@@ -197,6 +290,7 @@ export async function assembleContext(params: {
         title: todo.title,
         completed: todo.completed,
         projectName: todo.project?.name,
+        updatedAt: todo.updatedAt.toISOString(),
       })),
       allProjectNames: projects.map((project) => project.name),
       allArtifactTitles: artifacts.map((artifact) => ({
@@ -204,7 +298,9 @@ export async function assembleContext(params: {
         title: artifact.title,
         kind: artifact.kind,
         projectName: artifact.project?.name,
+        updatedAt: artifact.updatedAt.toISOString(),
       })),
+      recentWorkActivity,
     },
   };
 }

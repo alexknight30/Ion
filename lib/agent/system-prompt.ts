@@ -78,6 +78,31 @@ function formatProjects(names: string[]) {
   return names.join(", ");
 }
 
+function formatActivityTimestamp(isoDate: string) {
+  const date = new Date(isoDate);
+  if (Number.isNaN(date.getTime())) return isoDate;
+
+  return date.toLocaleString(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
+function formatRecentWorkActivity(
+  activity: MADContext["available"]["recentWorkActivity"]
+) {
+  if (activity.length === 0) return "none";
+  return activity
+    .map((entry) => {
+      const project = entry.projectName ? ` · ${entry.projectName}` : "";
+      return `- [${entry.type}] ${entry.title}${project} — updated ${formatActivityTimestamp(entry.updatedAt)}`;
+    })
+    .join("\n");
+}
+
 function formatArtifacts(
   artifacts: MADContext["available"]["allArtifactTitles"]
 ) {
@@ -85,7 +110,7 @@ function formatArtifacts(
   return artifacts
     .map((artifact) => {
       const project = artifact.projectName ? ` · ${artifact.projectName}` : "";
-      return `- ${artifact.title} (${artifact.kind})${project}`;
+      return `- ${artifact.title} (${artifact.kind})${project} — updated ${formatActivityTimestamp(artifact.updatedAt)}`;
     })
     .join("\n");
 }
@@ -144,7 +169,7 @@ Facts the user has set explicitly. Treat these as always true.
 - Pinned projects/artifacts come from what the user attached in the chat box for this message — treat these as intentionally elevated context.
 
 **A — Available context (deterministic workstation state)**
-What tab they are on, today's date, what is open, and lightweight indexes of what exists in Ion right now. Use this to narrow what is relevant.
+What tab they are on, today's date, what is open, lightweight indexes of what exists in Ion, and recent work timestamps (project/artifact/thought updates). Use timestamps to reason about activity — do not infer recency from counts alone.
 
 **D — Discernable context (your job)**
 Before answering, identify:
@@ -185,11 +210,18 @@ Active project: ${formatActiveProject(available.activeProject)}
 Active artifact: ${formatActiveArtifact(available.activeArtifact)}
 Recent projects: ${
     available.recentProjects.length > 0
-      ? available.recentProjects.map((project) => project.name).join(", ")
+      ? available.recentProjects
+          .map(
+            (project) =>
+              `${project.name} (updated ${formatActivityTimestamp(project.updatedAt)})`
+          )
+          .join(", ")
       : "none"
   }
 Today's todos (Organize tab only — read-only reference here):
 ${formatTodos(available.todosToday)}
+Recent work activity (newest first):
+${formatRecentWorkActivity(available.recentWorkActivity)}
 All projects: ${formatProjects(available.allProjectNames)}
 All artifacts:
 ${formatArtifacts(available.allArtifactTitles)}${formatConversationHistory(conversationHistory)}`;
