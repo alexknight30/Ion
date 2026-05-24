@@ -1,6 +1,6 @@
 "use client";
 
-import { type ReactNode } from "react";
+import { Fragment, type ReactNode } from "react";
 import { cn } from "@/lib/cn";
 
 const INLINE_MARKDOWN_PATTERN =
@@ -55,6 +55,84 @@ export function parseInlineMarkdown(text: string): ReactNode[] {
   return nodes.length > 0 ? nodes : [text];
 }
 
+function renderParagraphLines(text: string) {
+  const lines = text.split("\n");
+
+  return lines.map((line, index) => (
+    <Fragment key={index}>
+      {index > 0 ? <br /> : null}
+      {line ? parseInlineMarkdown(line) : null}
+    </Fragment>
+  ));
+}
+
+type ParagraphSegment =
+  | { kind: "text"; lines: string[] }
+  | { kind: "list"; items: string[] };
+
+function splitParagraphSegments(text: string): ParagraphSegment[] {
+  const segments: ParagraphSegment[] = [];
+
+  for (const line of text.split("\n")) {
+    const bulletMatch = line.match(/^-\s+(.*)$/);
+
+    if (bulletMatch) {
+      const last = segments[segments.length - 1];
+      if (last?.kind === "list") {
+        last.items.push(bulletMatch[1]);
+      } else {
+        segments.push({ kind: "list", items: [bulletMatch[1]] });
+      }
+      continue;
+    }
+
+    const last = segments[segments.length - 1];
+    if (last?.kind === "text") {
+      last.lines.push(line);
+    } else {
+      segments.push({ kind: "text", lines: [line] });
+    }
+  }
+
+  return segments;
+}
+
+function renderParagraphBlock(text: string, renderBulletLists: boolean) {
+  if (!renderBulletLists) {
+    return renderParagraphLines(text);
+  }
+
+  const segments = splitParagraphSegments(text);
+
+  return segments.map((segment, index) => {
+    if (segment.kind === "list") {
+      return (
+        <ul
+          key={`list-${index}`}
+          className="list-disc space-y-1 pl-5 marker:text-[var(--color-pumice)]"
+        >
+          {segment.items.map((item, itemIndex) => (
+            <li key={itemIndex}>{parseInlineMarkdown(item)}</li>
+          ))}
+        </ul>
+      );
+    }
+
+    const joined = segment.lines.join("\n");
+    if (!joined.trim()) {
+      return segment.lines.length > 1 ? (
+        <Fragment key={`text-${index}`}>
+          {renderParagraphLines(joined)}
+        </Fragment>
+      ) : null;
+    }
+
+    return (
+      <Fragment key={`text-${index}`}>{renderParagraphLines(joined)}</Fragment>
+    );
+  });
+}
+
 function StreamingCursor() {
   return (
     <span className="ml-0.5 inline-block h-[1em] w-[2px] translate-y-[2px] animate-pulse bg-[var(--color-pumice)]" />
@@ -65,16 +143,21 @@ interface FormattedTextProps {
   content: string;
   className?: string;
   streaming?: boolean;
+  renderBulletLists?: boolean;
 }
 
 export function FormattedText({
   content,
   className,
   streaming = false,
+  renderBulletLists = false,
 }: FormattedTextProps) {
-  const lines = content.split("\n");
+  const paragraphs = content.split(/\n{2,}/);
 
-  if (lines.length === 0 || (lines.length === 1 && lines[0] === "" && !streaming)) {
+  if (
+    paragraphs.length === 0 ||
+    (paragraphs.length === 1 && paragraphs[0] === "" && !streaming)
+  ) {
     return streaming ? (
       <div className={className}>
         <StreamingCursor />
@@ -84,11 +167,13 @@ export function FormattedText({
 
   return (
     <div className={cn("space-y-3", className)}>
-      {lines.map((line, index) => (
-        <p key={index}>
-          {line ? parseInlineMarkdown(line) : "\u00A0"}
-          {streaming && index === lines.length - 1 ? <StreamingCursor /> : null}
-        </p>
+      {paragraphs.map((paragraph, index) => (
+        <div key={index} className="space-y-2">
+          {paragraph ? renderParagraphBlock(paragraph, renderBulletLists) : "\u00A0"}
+          {streaming && index === paragraphs.length - 1 ? (
+            <StreamingCursor />
+          ) : null}
+        </div>
       ))}
     </div>
   );

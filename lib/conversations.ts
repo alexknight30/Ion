@@ -1,6 +1,8 @@
 export interface ConversationSummary {
   id: string;
   title: string | null;
+  pinnedProjectIds: string[];
+  pinnedArtifactIds: string[];
   createdAt: string;
   updatedAt: string;
   messageCount: number;
@@ -18,6 +20,8 @@ export interface ConversationMessage {
 export interface ConversationDetail {
   id: string;
   title: string | null;
+  pinnedProjectIds: string[];
+  pinnedArtifactIds: string[];
   createdAt: string;
   updatedAt: string;
   messages: ConversationMessage[];
@@ -46,6 +50,26 @@ export async function createConversation(): Promise<ConversationSummary> {
   if (!response.ok) {
     throw new Error("Failed to create conversation");
   }
+  return response.json();
+}
+
+export async function updateConversationPins(
+  conversationId: string,
+  input: {
+    pinnedProjectIds: string[];
+    pinnedArtifactIds: string[];
+  }
+): Promise<Pick<ConversationDetail, "id" | "pinnedProjectIds" | "pinnedArtifactIds">> {
+  const response = await fetch(`/api/conversations/${conversationId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to update conversation pins");
+  }
+
   return response.json();
 }
 

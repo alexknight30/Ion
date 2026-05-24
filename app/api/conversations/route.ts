@@ -1,5 +1,6 @@
 import { db } from "@/lib/db";
 import { json, serverError } from "@/lib/api";
+import { parsePinnedIdList } from "@/lib/conversation-pins";
 
 function deriveConversationTitle(message: string) {
   const trimmed = message.trim().replace(/\s+/g, " ");
@@ -44,6 +45,8 @@ export async function GET() {
           conversation.id,
           conversation.title
         ),
+        pinnedProjectIds: [],
+        pinnedArtifactIds: [],
         createdAt: conversation.createdAt,
         updatedAt: conversation.updatedAt,
         messageCount: conversation._count.messages,
@@ -63,6 +66,8 @@ export async function POST() {
       {
         id: conversation.id,
         title: conversation.title,
+        pinnedProjectIds: parsePinnedIdList(conversation.pinnedProjectIds),
+        pinnedArtifactIds: parsePinnedIdList(conversation.pinnedArtifactIds),
         createdAt: conversation.createdAt,
         updatedAt: conversation.updatedAt,
         messageCount: 0,

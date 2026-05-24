@@ -9,6 +9,7 @@ import {
 } from "@/lib/agent/system-prompt";
 import { estimateTokenPriceUsd } from "@/lib/agent/pricing";
 import { logTokenUsage } from "@/lib/usage-server";
+import { serializePinnedIdList } from "@/lib/conversation-pins";
 
 export const AGENT_CONFIG_ID = "default";
 export const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
@@ -107,8 +108,19 @@ export async function prepareAgentRun(body: ParsedAgentRequest) {
 
   if (!conversation) {
     conversation = await db.conversation.create({
-      data: {},
+      data: {
+        pinnedProjectIds: serializePinnedIdList(body.pinnedProjectIds),
+        pinnedArtifactIds: serializePinnedIdList(body.pinnedArtifactIds),
+      },
       include: { messages: true },
+    });
+  } else {
+    await db.conversation.update({
+      where: { id: conversation.id },
+      data: {
+        pinnedProjectIds: serializePinnedIdList(body.pinnedProjectIds),
+        pinnedArtifactIds: serializePinnedIdList(body.pinnedArtifactIds),
+      },
     });
   }
 

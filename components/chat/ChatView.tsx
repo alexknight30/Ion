@@ -3,7 +3,9 @@
 import { useEffect, useRef, useState } from "react";
 import {
   ArrowUp,
+  Check,
   ChevronRight,
+  Copy,
   FileText,
   Image as ImageIcon,
   Plus,
@@ -19,6 +21,7 @@ import { getTodayDate, toDateKey } from "@/lib/calendar";
 import {
   fetchConversation,
   fetchConversations,
+  updateConversationPins,
   type ConversationSummary,
 } from "@/lib/conversations";
 import { fetchProfile, getFirstName } from "@/lib/profile";
@@ -77,14 +80,47 @@ function UserMessage({ content }: { content: string }) {
 function AssistantMessage({
   content,
   streaming = false,
+  showCopy = false,
 }: {
   content: string;
   streaming?: boolean;
+  showCopy?: boolean;
 }) {
+  const [copied, setCopied] = useState(false);
+
+  async function handleCopy() {
+    try {
+      await navigator.clipboard.writeText(content);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // Clipboard access can fail in some browsers.
+    }
+  }
+
   return (
     <div className="flex justify-start">
       <div className="max-w-[95%] text-[15px] leading-[1.6] tracking-[-0.01em] text-[var(--color-bone)]">
-        <FormattedText content={content} streaming={streaming} />
+        <FormattedText
+          content={content}
+          streaming={streaming}
+          renderBulletLists
+        />
+        {showCopy && content.trim() && !streaming ? (
+          <button
+            type="button"
+            onClick={() => void handleCopy()}
+            aria-label={copied ? "Copied" : "Copy reply"}
+            className="mt-2 flex items-center gap-1.5 text-[12px] text-[var(--color-pumice)] transition-colors duration-200 hover:text-[var(--color-steam)]"
+          >
+            {copied ? (
+              <Check size={14} strokeWidth={1.5} />
+            ) : (
+              <Copy size={14} strokeWidth={1.5} />
+            )}
+            {copied ? "Copied" : "Copy"}
+          </button>
+        ) : null}
       </div>
     </div>
   );
@@ -578,6 +614,7 @@ export function ChatView() {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const streamBufferRef = useRef<{ id: string; content: string } | null>(null);
   const streamRafRef = useRef<number | null>(null);
+  const skipPinPersistRef = useRef(false);
 
   const selectedProjects = projects.filter((project) =>
     selectedProjectIds.includes(project.id)
@@ -724,6 +761,29 @@ export function ChatView() {
     adjustInputHeight();
   }, [input]);
 
+  useEffect(() => {
+    if (!conversationId || skipPinPersistRef.current) {
+      skipPinPersistRef.current = false;
+      return;
+    }
+
+    const timeout = window.setTimeout(() => {
+      void updateConversationPins(conversationId, {
+        pinnedProjectIds: selectedProjectIds,
+        pinnedArtifactIds: selectedArtifactIds,
+      }).catch(() => {
+        // Non-blocking; pins still apply to the next message.
+      });
+    }, 300);
+
+    return () => window.clearTimeout(timeout);
+  }, [conversationId, selectedProjectIds, selectedArtifactIds]);
+
+  const latestAssistantMessageId = [...messages]
+    .reverse()
+    .find((message) => message.role === "assistant" && message.content.trim())
+    ?.id;
+
   async function handleSend() {
     const trimmed = input.trim();
     if (!trimmed || isStreaming || loadingConversationId) return;
@@ -798,8 +858,11 @@ export function ChatView() {
 
     try {
       const conversation = await fetchConversation(nextConversationId);
+      skipPinPersistRef.current = true;
       setConversationId(conversation.id);
       setMessages(mapDbMessages(conversation.messages));
+      setSelectedProjectIds(conversation.pinnedProjectIds);
+      setSelectedArtifactIds(conversation.pinnedArtifactIds);
     } catch {
       setSendError("Could not load conversation.");
     } finally {
@@ -809,8 +872,11 @@ export function ChatView() {
 
   function handleNewChat() {
     if (isStreaming) return;
+    skipPinPersistRef.current = true;
     setConversationId(null);
     setMessages([]);
+    setSelectedProjectIds([]);
+    setSelectedArtifactIds([]);
     setSendError(null);
     setInput("");
   }
@@ -883,6 +949,7 @@ export function ChatView() {
                       streaming={
                         isStreaming && message.id === streamingMessageId
                       }
+                      showCopy={message.id === latestAssistantMessageId}
                     />
                   )
                 )}
