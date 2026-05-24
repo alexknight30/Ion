@@ -5,6 +5,7 @@ import {
   ArrowUp,
   Briefcase,
   ChevronDown,
+  ChevronRight,
   Clock,
   Download,
   FileText,
@@ -23,6 +24,12 @@ import { getMockChatResponse } from "@/lib/chat-mock";
 import { getRandomChatGreeting } from "@/lib/chat-greetings";
 import { fetchProfile, getFirstName } from "@/lib/profile";
 import { fetchProjects, type Project } from "@/lib/projects";
+import { fetchArtifacts, type Artifact } from "@/lib/artifacts";
+import { getProjectListArtifacts } from "@/lib/artifact-select-options";
+import {
+  getArtifactDisplayTitle,
+  getArtifactTypeLabel,
+} from "@/lib/artifact-constants";
 
 interface Message {
   id: string;
@@ -193,80 +200,192 @@ function ProjectColorDot({ color }: { color: string | null }) {
 function ChatAttachmentMenu({
   open,
   projects,
+  artifacts,
   selectedProjectIds,
+  selectedArtifactIds,
   onAddFiles,
   onAddImage,
   onToggleProject,
+  onToggleArtifact,
 }: {
   open: boolean;
   projects: Project[];
+  artifacts: Artifact[];
   selectedProjectIds: string[];
+  selectedArtifactIds: string[];
   onAddFiles: () => void;
   onAddImage: () => void;
   onToggleProject: (projectId: string) => void;
+  onToggleArtifact: (artifactId: string) => void;
 }) {
+  const [expandedProjectId, setExpandedProjectId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!open) {
+      setExpandedProjectId(null);
+    }
+  }, [open]);
+
   if (!open) return null;
 
+  const expandedProject = projects.find(
+    (project) => project.id === expandedProjectId
+  );
+  const expandedProjectArtifacts = expandedProject
+    ? getProjectListArtifacts(artifacts, expandedProject.id)
+    : [];
+
   return (
-    <ul
-      role="menu"
-      aria-label="Add to chat"
-      className="absolute bottom-[calc(100%+8px)] left-0 z-20 w-56 overflow-hidden rounded-[10px] border border-[var(--color-border-subtle)] bg-[var(--color-obsidian)] py-1 shadow-[0_4px_24px_var(--color-shadow-soft)]"
-    >
-      <li role="none">
-        <button
-          type="button"
-          role="menuitem"
-          onClick={onAddFiles}
-          className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-[13px] tracking-[-0.01em] text-[var(--color-bone)] transition-colors duration-200 hover:bg-[var(--color-ash)]"
-        >
-          <FileText size={15} strokeWidth={1.5} className="shrink-0 text-[var(--color-steam)]" />
-          Add files
-        </button>
-      </li>
-      <li role="none">
-        <button
-          type="button"
-          role="menuitem"
-          onClick={onAddImage}
-          className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-[13px] tracking-[-0.01em] text-[var(--color-bone)] transition-colors duration-200 hover:bg-[var(--color-ash)]"
-        >
-          <ImageIcon size={15} strokeWidth={1.5} className="shrink-0 text-[var(--color-steam)]" />
-          Add image
-        </button>
-      </li>
-
-      <li role="separator" aria-hidden className="my-1 h-px bg-[var(--color-border-subtle)]" />
-
-      {projects.length === 0 ? (
-        <li className="px-3 py-2 text-[12px] text-[var(--color-pumice)]">
-          No projects yet
+    <div className="absolute bottom-[calc(100%+8px)] left-0 z-20 flex items-start gap-2">
+      <ul
+        role="menu"
+        aria-label="Add to chat"
+        className="w-56 shrink-0 rounded-[10px] border border-[var(--color-border-subtle)] bg-[var(--color-obsidian)] py-1 shadow-[0_4px_24px_var(--color-shadow-soft)]"
+      >
+        <li role="none">
+          <button
+            type="button"
+            role="menuitem"
+            onClick={onAddFiles}
+            className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-[13px] tracking-[-0.01em] text-[var(--color-bone)] transition-colors duration-200 hover:bg-[var(--color-ash)]"
+          >
+            <FileText size={15} strokeWidth={1.5} className="shrink-0 text-[var(--color-steam)]" />
+            Add files
+          </button>
         </li>
-      ) : (
-        projects.map((project) => {
-          const selected = selectedProjectIds.includes(project.id);
-          return (
-            <li key={project.id} role="none">
-              <button
-                type="button"
-                role="menuitemcheckbox"
-                aria-checked={selected}
-                onClick={() => onToggleProject(project.id)}
-                className={cn(
-                  "flex w-full items-center justify-between gap-3 px-3 py-2 text-left transition-colors duration-200 hover:bg-[var(--color-ash)]",
-                  selected && "bg-[var(--color-ash)]"
-                )}
-              >
-                <span className="min-w-0 truncate text-[13px] tracking-[-0.01em] text-[var(--color-bone)]">
-                  {project.name}
-                </span>
-                <ProjectColorDot color={project.color} />
-              </button>
-            </li>
-          );
-        })
-      )}
-    </ul>
+        <li role="none">
+          <button
+            type="button"
+            role="menuitem"
+            onClick={onAddImage}
+            className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-[13px] tracking-[-0.01em] text-[var(--color-bone)] transition-colors duration-200 hover:bg-[var(--color-ash)]"
+          >
+            <ImageIcon size={15} strokeWidth={1.5} className="shrink-0 text-[var(--color-steam)]" />
+            Add image
+          </button>
+        </li>
+
+        <li role="separator" aria-hidden className="my-1 h-px bg-[var(--color-border-subtle)]" />
+
+        {projects.length === 0 ? (
+          <li className="px-3 py-2 text-[12px] text-[var(--color-pumice)]">
+            No projects yet
+          </li>
+        ) : (
+          <li role="none" className="max-h-48 overflow-y-auto">
+            <ul role="group" aria-label="Projects">
+              {projects.map((project) => {
+                const selected = selectedProjectIds.includes(project.id);
+                const artifactsExpanded = expandedProjectId === project.id;
+
+                return (
+                  <li key={project.id} role="none">
+                    <div
+                      className={cn(
+                        "flex items-center transition-colors duration-200 hover:bg-[var(--color-ash)]",
+                        selected && "bg-[var(--color-ash)]",
+                        artifactsExpanded && "bg-[var(--color-ash)]"
+                      )}
+                    >
+                      <button
+                        type="button"
+                        role="menuitemcheckbox"
+                        aria-checked={selected}
+                        onClick={() => onToggleProject(project.id)}
+                        className="flex min-w-0 flex-1 items-center px-3 py-2 text-left"
+                      >
+                        <span className="truncate text-[13px] tracking-[-0.01em] text-[var(--color-bone)]">
+                          {project.name}
+                        </span>
+                      </button>
+
+                      <div className="flex shrink-0 items-center gap-1 pr-1.5">
+                        <ProjectColorDot color={project.color} />
+                        <button
+                          type="button"
+                          aria-label={`Browse artifacts in ${project.name}`}
+                          aria-haspopup="menu"
+                          aria-expanded={artifactsExpanded}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            setExpandedProjectId((current) =>
+                              current === project.id ? null : project.id
+                            );
+                          }}
+                          className={cn(
+                            "flex h-6 w-6 items-center justify-center rounded-[4px] text-[var(--color-pumice)] transition-colors duration-200 hover:bg-[var(--color-frost)] hover:text-[var(--color-steam)]",
+                            artifactsExpanded &&
+                              "bg-[var(--color-frost)] text-[var(--color-steam)]"
+                          )}
+                        >
+                          <ChevronRight
+                            size={14}
+                            strokeWidth={1.5}
+                            className={cn(
+                              "transition-transform duration-200",
+                              artifactsExpanded && "rotate-90"
+                            )}
+                          />
+                        </button>
+                      </div>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          </li>
+        )}
+      </ul>
+
+      {expandedProject ? (
+        <div className="w-56 shrink-0 overflow-hidden rounded-[10px] border border-[var(--color-border-subtle)] bg-[var(--color-obsidian)] shadow-[0_4px_24px_var(--color-shadow-soft)]">
+          <div className="flex items-center gap-2 border-b border-[var(--color-border-subtle)] px-3 py-2">
+            <ProjectColorDot color={expandedProject.color} />
+            <span className="min-w-0 truncate text-[12px] font-medium tracking-[-0.01em] text-[var(--color-steam)]">
+              {expandedProject.name}
+            </span>
+          </div>
+          <ul
+            role="menu"
+            aria-label={`Artifacts in ${expandedProject.name}`}
+            className="max-h-48 overflow-y-auto py-1"
+          >
+            {expandedProjectArtifacts.length === 0 ? (
+              <li className="px-3 py-2 text-[12px] text-[var(--color-pumice)]">
+                No artifacts yet
+              </li>
+            ) : (
+              expandedProjectArtifacts.map((artifact) => {
+                const artifactSelected = selectedArtifactIds.includes(
+                  artifact.id
+                );
+                return (
+                  <li key={artifact.id} role="none">
+                    <button
+                      type="button"
+                      role="menuitemcheckbox"
+                      aria-checked={artifactSelected}
+                      onClick={() => onToggleArtifact(artifact.id)}
+                      className={cn(
+                        "flex w-full flex-col gap-0.5 px-3 py-2 text-left transition-colors duration-200 hover:bg-[var(--color-ash)]",
+                        artifactSelected && "bg-[var(--color-ash)]"
+                      )}
+                    >
+                      <span className="truncate text-[13px] tracking-[-0.01em] text-[var(--color-bone)]">
+                        {getArtifactDisplayTitle(artifact)}
+                      </span>
+                      <span className="text-[11px] text-[var(--color-pumice)]">
+                        {getArtifactTypeLabel(artifact.kind)}
+                      </span>
+                    </button>
+                  </li>
+                );
+              })
+            )}
+          </ul>
+        </div>
+      ) : null}
+    </div>
   );
 }
 
@@ -274,35 +393,43 @@ function ChatComposer({
   input,
   canSend,
   projects,
+  artifacts,
   files,
   images,
   selectedProjects,
+  selectedArtifacts,
   onInputChange,
   onSend,
   onKeyDown,
   onAddFiles,
   onAddImages,
   onToggleProject,
+  onToggleArtifact,
   onRemoveFile,
   onRemoveImage,
   onRemoveProject,
+  onRemoveArtifact,
   textareaRef,
 }: {
   input: string;
   canSend: boolean;
   projects: Project[];
+  artifacts: Artifact[];
   files: File[];
   images: File[];
   selectedProjects: Project[];
+  selectedArtifacts: Artifact[];
   onInputChange: (value: string) => void;
   onSend: () => void;
   onKeyDown: (event: React.KeyboardEvent<HTMLTextAreaElement>) => void;
   onAddFiles: (files: FileList | null) => void;
   onAddImages: (files: FileList | null) => void;
   onToggleProject: (projectId: string) => void;
+  onToggleArtifact: (artifactId: string) => void;
   onRemoveFile: (index: number) => void;
   onRemoveImage: (index: number) => void;
   onRemoveProject: (projectId: string) => void;
+  onRemoveArtifact: (artifactId: string) => void;
   textareaRef: React.RefObject<HTMLTextAreaElement | null>;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -310,7 +437,10 @@ function ChatComposer({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const hasAttachments =
-    files.length > 0 || images.length > 0 || selectedProjects.length > 0;
+    files.length > 0 ||
+    images.length > 0 ||
+    selectedProjects.length > 0 ||
+    selectedArtifacts.length > 0;
 
   useEffect(() => {
     function handlePointerDown(event: PointerEvent) {
@@ -390,6 +520,32 @@ function ChatComposer({
                   </button>
                 </span>
               ))}
+              {selectedArtifacts.map((artifact) => {
+                const projectColor =
+                  projects.find((project) => project.id === artifact.projectId)
+                    ?.color ??
+                  artifact.project?.color ??
+                  null;
+                const artifactTitle = getArtifactDisplayTitle(artifact);
+
+                return (
+                  <span
+                    key={artifact.id}
+                    className="inline-flex max-w-full items-center gap-1.5 rounded-[8px] bg-[var(--color-ash)] py-1 pl-2 pr-1 text-[12px] text-[var(--color-bone)]"
+                  >
+                    <ProjectColorDot color={projectColor} />
+                    <span className="truncate">{artifactTitle}</span>
+                    <button
+                      type="button"
+                      aria-label={`Remove ${artifactTitle}`}
+                      onClick={() => onRemoveArtifact(artifact.id)}
+                      className="flex h-5 w-5 shrink-0 items-center justify-center rounded-[4px] text-[var(--color-pumice)] transition-colors duration-200 hover:bg-[var(--color-frost)] hover:text-[var(--color-bone)]"
+                    >
+                      <X size={12} strokeWidth={1.5} />
+                    </button>
+                  </span>
+                );
+              })}
             </div>
           ) : null}
 
@@ -412,10 +568,15 @@ function ChatComposer({
               <ChatAttachmentMenu
                 open={menuOpen}
                 projects={projects}
+                artifacts={artifacts}
                 selectedProjectIds={selectedProjects.map((project) => project.id)}
+                selectedArtifactIds={selectedArtifacts.map(
+                  (artifact) => artifact.id
+                )}
                 onAddFiles={handleAddFilesClick}
                 onAddImage={handleAddImageClick}
                 onToggleProject={onToggleProject}
+                onToggleArtifact={onToggleArtifact}
               />
             </div>
 
@@ -484,15 +645,20 @@ export function ChatView() {
   const [greeting, setGreeting] = useState("Ask Ion");
   const [profileInitial, setProfileInitial] = useState("A");
   const [projects, setProjects] = useState<Project[]>([]);
+  const [artifacts, setArtifacts] = useState<Artifact[]>([]);
   const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
   const [attachedImages, setAttachedImages] = useState<File[]>([]);
   const [selectedProjectIds, setSelectedProjectIds] = useState<string[]>([]);
+  const [selectedArtifactIds, setSelectedArtifactIds] = useState<string[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const pendingReply = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const selectedProjects = projects.filter((project) =>
     selectedProjectIds.includes(project.id)
+  );
+  const selectedArtifacts = artifacts.filter((artifact) =>
+    selectedArtifactIds.includes(artifact.id)
   );
 
   const canSend = input.trim().length > 0 && !isThinking;
@@ -529,6 +695,22 @@ export function ChatView() {
       })
       .catch(() => {
         if (!cancelled) setProjects([]);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    fetchArtifacts()
+      .then((data) => {
+        if (!cancelled) setArtifacts(data);
+      })
+      .catch(() => {
+        if (!cancelled) setArtifacts([]);
       });
 
     return () => {
@@ -608,6 +790,14 @@ export function ChatView() {
     );
   }
 
+  function handleToggleArtifact(artifactId: string) {
+    setSelectedArtifactIds((current) =>
+      current.includes(artifactId)
+        ? current.filter((id) => id !== artifactId)
+        : [...current, artifactId]
+    );
+  }
+
   return (
     <div className="flex h-full min-h-0 bg-[var(--color-void)]">
       <ChatSidebar profileInitial={profileInitial} />
@@ -644,15 +834,18 @@ export function ChatView() {
           input={input}
           canSend={canSend}
           projects={projects}
+          artifacts={artifacts}
           files={attachedFiles}
           images={attachedImages}
           selectedProjects={selectedProjects}
+          selectedArtifacts={selectedArtifacts}
           onInputChange={setInput}
           onSend={handleSend}
           onKeyDown={handleKeyDown}
           onAddFiles={handleAddFiles}
           onAddImages={handleAddImages}
           onToggleProject={handleToggleProject}
+          onToggleArtifact={handleToggleArtifact}
           onRemoveFile={(index) =>
             setAttachedFiles((current) => current.filter((_, i) => i !== index))
           }
@@ -662,6 +855,11 @@ export function ChatView() {
           onRemoveProject={(projectId) =>
             setSelectedProjectIds((current) =>
               current.filter((id) => id !== projectId)
+            )
+          }
+          onRemoveArtifact={(artifactId) =>
+            setSelectedArtifactIds((current) =>
+              current.filter((id) => id !== artifactId)
             )
           }
           textareaRef={textareaRef}
