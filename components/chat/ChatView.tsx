@@ -33,6 +33,7 @@ import {
   getArtifactTypeLabel,
 } from "@/lib/artifact-constants";
 import { ConversationSidebar } from "./ConversationSidebar";
+import { UserMessage } from "./UserMessage";
 
 interface Message {
   id: string;
@@ -63,16 +64,6 @@ function EmptyState({ greeting }: { greeting: string }) {
       <h2 className="max-w-md text-[22px] font-medium tracking-[-0.02em] text-[var(--color-glacier)]">
         {greeting}
       </h2>
-    </div>
-  );
-}
-
-function UserMessage({ content }: { content: string }) {
-  return (
-    <div className="flex justify-end">
-      <div className="max-w-[85%] rounded-[18px] bg-[var(--color-ash)] px-4 py-3 text-[15px] leading-[1.6] tracking-[-0.01em] text-[var(--color-bone)]">
-        <p className="whitespace-pre-wrap">{content}</p>
-      </div>
     </div>
   );
 }
@@ -589,7 +580,13 @@ function ChatComposer({
   );
 }
 
-export function ChatView() {
+export function ChatView({
+  openConversationId = null,
+  onOpenConversationHandled,
+}: {
+  openConversationId?: string | null;
+  onOpenConversationHandled?: () => void;
+} = {}) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
@@ -683,6 +680,19 @@ export function ChatView() {
   useEffect(() => {
     void refreshConversations();
   }, []);
+
+  useEffect(() => {
+    if (!openConversationId || isStreaming) return;
+    if (openConversationId === conversationId) {
+      onOpenConversationHandled?.();
+      return;
+    }
+
+    void handleSelectConversation(openConversationId).finally(() => {
+      onOpenConversationHandled?.();
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openConversationId]);
 
   useEffect(() => {
     return () => {

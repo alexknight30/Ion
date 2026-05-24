@@ -181,9 +181,8 @@ function SettingsView({ isActive }: { isActive: boolean }) {
   );
 }
 
-const views: Record<Exclude<Tab, "Organize" | "Settings">, ReactNode> = {
+const views: Record<Exclude<Tab, "Organize" | "Settings" | "Chat">, ReactNode> = {
   Work: <WorkView />,
-  Chat: <ChatView />,
 };
 
 const tabLayout: Record<Tab, string> = {
@@ -200,6 +199,9 @@ export default function Home() {
   const [agentOpen, setAgentOpen] = useState(false);
   const [agentDocked, setAgentDocked] = useState(false);
   const [agentQuery, setAgentQuery] = useState("");
+  const [pendingChatConversationId, setPendingChatConversationId] = useState<
+    string | null
+  >(null);
   const wasEmailModeRef = useRef(false);
 
   const emailModeOnOrganize = activeTab === "Organize" && inboxExpanded;
@@ -233,13 +235,19 @@ export default function Home() {
             onInboxExpandedChange={setInboxExpanded}
           />
         </div>
-        {(Object.keys(views) as Array<Exclude<Tab, "Organize" | "Settings">>).map(
+        {(Object.keys(views) as Array<Exclude<Tab, "Organize" | "Settings" | "Chat">>).map(
           (tab) => (
             <div key={tab} hidden={activeTab !== tab} className={tabLayout[tab]}>
               {views[tab]}
             </div>
           )
         )}
+        <div hidden={activeTab !== "Chat"} className={tabLayout.Chat}>
+          <ChatView
+            openConversationId={pendingChatConversationId}
+            onOpenConversationHandled={() => setPendingChatConversationId(null)}
+          />
+        </div>
         <div hidden={activeTab !== "Settings"} className={tabLayout.Settings}>
           <SettingsView isActive={activeTab === "Settings"} />
         </div>
@@ -251,6 +259,10 @@ export default function Home() {
           placeholder={
             emailModeOnOrganize ? "Need help drafting?" : "Ask Ion"
           }
+          onOpenInChat={(conversationId) => {
+            setPendingChatConversationId(conversationId);
+            setActiveTab("Chat");
+          }}
         />
       ) : null}
     </div>

@@ -159,6 +159,16 @@ You do not have tools yet — reason only from M and A. When helpful, briefly st
 - Not sycophantic. No filler praise.
 - If you lack enough context to answer confidently, ask one specific clarifying question instead of guessing.${formatFirstMessageDuty(options?.isFirstMessage ?? false)}
 
+## Ion tabs (where features live)
+
+- Organize: calendar, inbox, and the daily todo list (view, add, complete, and reorder todos for the selected date)
+- Work: projects, artifacts, thought journals, and whiteboard documents
+- Chat: full conversations with optional pinned project/artifact context
+- Settings: profile, agent configuration, integrations, and usage
+
+Current tab: ${available.currentTab}
+Only recommend actions the user can take on their current tab. Todos are created and managed only on the Organize tab — never suggest adding todos while the user is on Work, Chat, or Settings. If todos are relevant, tell them to switch to Organize or reference today's list as read-only context below.
+
 --- MANUAL CONTEXT (M) ---
 User profile: ${userLine || "Unknown user"}${companyLine}
 
@@ -178,7 +188,7 @@ Recent projects: ${
       ? available.recentProjects.map((project) => project.name).join(", ")
       : "none"
   }
-Today's todos:
+Today's todos (Organize tab only — read-only reference here):
 ${formatTodos(available.todosToday)}
 All projects: ${formatProjects(available.allProjectNames)}
 All artifacts:

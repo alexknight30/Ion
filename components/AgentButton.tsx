@@ -6,16 +6,20 @@ import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/cn";
 import { SmartInput } from "@/components/ui/SmartTextarea";
 import { FormattedText } from "@/components/ui/FormattedText";
+import { UserMessage } from "@/components/chat/UserMessage";
 import { streamAgentMessage } from "@/lib/agent";
 import { getTodayDate, toDateKey } from "@/lib/calendar";
 
 const ease = [0.16, 1, 0.3, 1] as const;
 const CLICK_DELAY_MS = 250;
 const BUTTON_SIZE_PX = 56;
+const INPUT_WIDTH_PX = 480;
+const ROW_GAP_PX = 12;
 const LEFT_OFFSET_PX = 24;
 const DOCKED_VISIBLE_PX = 15;
 const DOCKED_OFFSET_PX =
   LEFT_OFFSET_PX + BUTTON_SIZE_PX - DOCKED_VISIBLE_PX;
+const PANEL_WIDTH_PX = BUTTON_SIZE_PX + ROW_GAP_PX + INPUT_WIDTH_PX;
 
 export interface AgentButtonState {
   open: boolean;
@@ -30,6 +34,7 @@ interface AgentButtonProps extends AgentButtonState {
   currentTab: string;
   placeholder?: string;
   className?: string;
+  onOpenInChat?: (conversationId: string) => void;
 }
 
 export function AgentButton({
@@ -42,16 +47,22 @@ export function AgentButton({
   onOpenChange,
   onDockedChange,
   onQueryChange,
+  onOpenInChat,
 }: AgentButtonProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const clickTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [conversationId, setConversationId] = useState<string | null>(null);
+  const [lastUserMessage, setLastUserMessage] = useState<string | null>(null);
   const [reply, setReply] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isThinking, setIsThinking] = useState(false);
 
   const streamBufferRef = useRef("");
   const streamRafRef = useRef<number | null>(null);
+
+  const showResponseCard =
+    open &&
+    (lastUserMessage || reply || error || (isThinking && !reply));
 
   useEffect(() => {
     if (open) {
@@ -94,6 +105,7 @@ export function AgentButton({
     const trimmed = query.trim();
     if (!trimmed || isThinking) return;
 
+    setLastUserMessage(trimmed);
     setIsThinking(true);
     setError(null);
     setReply(null);
@@ -111,8 +123,8 @@ export function AgentButton({
           setConversationId(nextConversationId);
         },
         onDelta: appendReplyDelta,
-        onDone: ({ reply }) => {
-          flushReply(reply);
+        onDone: ({ reply: nextReply }) => {
+          flushReply(nextReply);
         },
       });
 
@@ -158,6 +170,11 @@ export function AgentButton({
     onDockedChange(true);
   }
 
+  function handleOpenInChat() {
+    if (!conversationId || !onOpenInChat) return;
+    onOpenInChat(conversationId);
+  }
+
   return (
     <motion.div
       className={cn(
@@ -167,6 +184,45 @@ export function AgentButton({
       animate={{ x: docked ? -DOCKED_OFFSET_PX : 0 }}
       transition={{ duration: 0.4, ease }}
     >
+      {showResponseCard ? (
+        <div
+          className="rounded-[12px] border border-[var(--color-border-subtle)] bg-[var(--color-obsidian)] px-4 py-3 shadow-[0_2px_12px_var(--color-shadow-soft)]"
+          style={{ width: PANEL_WIDTH_PX }}
+        >
+          {conversationId && onOpenInChat ? (
+            <div className="mb-3 flex justify-end">
+              <button
+                type="button"
+                onClick={handleOpenInChat}
+                disabled={isThinking}
+                className="text-[12px] font-medium tracking-[-0.01em] text-[var(--color-pumice)] transition-colors duration-200 hover:text-[var(--color-glacier)] disabled:opacity-50"
+              >
+                Open in Chat
+              </button>
+            </div>
+          ) : null}
+
+          {lastUserMessage ? (
+            <UserMessage content={lastUserMessage} className="mb-3 flex justify-end" />
+          ) : null}
+
+          {isThinking && !reply ? (
+            <p className="text-[13px] text-[var(--color-pumice)]">Thinking…</p>
+          ) : null}
+          {error ? (
+            <p className="text-[13px] text-[var(--color-ember)]">{error}</p>
+          ) : null}
+          {reply ? (
+            <FormattedText
+              content={reply}
+              streaming={isThinking}
+              renderBulletLists
+              className="text-[14px] leading-relaxed tracking-[-0.01em] text-[var(--color-bone)]"
+            />
+          ) : null}
+        </div>
+      ) : null}
+
       <div className="flex items-center gap-3">
         <motion.button
           type="button"
@@ -195,12 +251,15 @@ export function AgentButton({
           {open ? (
             <motion.div
               initial={{ width: 0, opacity: 0 }}
-              animate={{ width: 360, opacity: 1 }}
+              animate={{ width: INPUT_WIDTH_PX, opacity: 1 }}
               exit={{ width: 0, opacity: 0 }}
               transition={{ duration: 0.4, ease }}
               className="overflow-hidden"
             >
-              <div className="flex h-14 w-[360px] items-center rounded-[12px] border border-[var(--color-border-active)] bg-[var(--color-obsidian)] shadow-[0_2px_12px_var(--color-shadow-soft),0_0_0_1px_var(--color-border-subtle)]">
+              <div
+                className="flex h-14 items-center rounded-[12px] border border-[var(--color-border-active)] bg-[var(--color-obsidian)] shadow-[0_2px_12px_var(--color-shadow-soft),0_0_0_1px_var(--color-border-subtle)]"
+                style={{ width: INPUT_WIDTH_PX }}
+              >
                 <SmartInput
                   ref={inputRef}
                   type="text"
@@ -235,24 +294,6 @@ export function AgentButton({
           ) : null}
         </AnimatePresence>
       </div>
-
-      {open && (reply || error || (isThinking && !reply)) ? (
-        <div className="ml-[68px] w-[360px] rounded-[12px] border border-[var(--color-border-subtle)] bg-[var(--color-obsidian)] px-4 py-3 shadow-[0_2px_12px_var(--color-shadow-soft)]">
-          {isThinking && !reply ? (
-            <p className="text-[13px] text-[var(--color-pumice)]">Thinking…</p>
-          ) : null}
-          {error ? (
-            <p className="text-[13px] text-[var(--color-ember)]">{error}</p>
-          ) : null}
-          {reply ? (
-            <FormattedText
-              content={reply}
-              streaming={isThinking}
-              className="text-[14px] leading-relaxed tracking-[-0.01em] text-[var(--color-bone)]"
-            />
-          ) : null}
-        </div>
-      ) : null}
     </motion.div>
   );
 }
